@@ -1,4 +1,6 @@
 version: "2"
+run:
+  timeout: 5m
 linters:
   default: standard
   enable:
@@ -7,8 +9,31 @@ linters:
     - unconvert
     - unparam
     - bodyclose
+    - nestif
+    - gocognit
+    - gocyclo
+    - funlen
+    - revive
+  settings:
+    nestif:
+      min-complexity: 4
+    gocognit:
+      min-complexity: 20
+    gocyclo:
+      min-complexity: 15
+    funlen:
+      lines: 60
+      statements: 40
+    revive:
+      rules:
+        - name: early-return
+        - name: indent-error-flow
+        - name: superfluous-else
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - funlen
 formatters:
   enable:
     - gofmt
-run:
-  timeout: 5m

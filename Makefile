@@ -4,7 +4,7 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 PKG     := github.com/drizki/backup-cli/internal/version
 LDFLAGS := -s -w -X $(PKG).Version=$(VERSION) -X $(PKG).Commit=$(COMMIT) -X $(PKG).Date=$(DATE)
 
-.PHONY: build test race cover lint vuln shellcheck fmt vet check
+.PHONY: build test race cover lint vuln shellcheck fmt vet size complete covergate check
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o backup-cli ./cmd/backup-cli
@@ -35,4 +35,14 @@ fmt:
 vet:
 	go vet ./...
 
-check: fmt vet race lint vuln shellcheck
+size:
+	./scripts/check-file-size.sh
+
+complete:
+	./scripts/check-completeness.sh
+
+covergate:
+	go test -race -coverprofile=coverage.out ./... >/dev/null
+	./scripts/check-coverage.sh coverage.out
+
+check: fmt vet size complete covergate lint vuln shellcheck

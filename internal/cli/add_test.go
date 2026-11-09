@@ -326,3 +326,12 @@ func TestAddAnalyzeHook(t *testing.T) {
 }
 
 var _ systemd.Manager = (*systemd.Fake)(nil)
+
+func TestAddCleansTheDestinationTemplate(t *testing.T) {
+	e := newEnv(t)
+	e.mustRun("add", e.src, e.dstP+"//./data-{timestamp}", "--no-schedule")
+	j, err := e.store().LoadJob("data")
+	if err != nil || j.DstTemplate != filepath.Join(e.dstP, "data-{timestamp}") {
+		t.Fatalf("template %q, %v", j.DstTemplate, err)
+	}
+}

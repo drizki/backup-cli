@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 
 	"github.com/drizki/backup-cli/internal/backupset"
@@ -50,7 +51,7 @@ func Prune(ctx context.Context, g safedelete.Guard, j job.Job, committed []backu
 		if ctx.Err() != nil {
 			return errors.Join(append(errs, ctx.Err())...)
 		}
-		if b.Path == current {
+		if filepath.Clean(b.Path) == filepath.Clean(current) {
 			log.Warnf("retention: not removing %s, it is the backup just made", b.Name)
 			continue
 		}

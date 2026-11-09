@@ -98,6 +98,9 @@ func (s Store) LoadJob(name string) (job.Job, error) {
 	if err := json.Unmarshal(b, &j); err != nil {
 		return j, fmt.Errorf("job %q: corrupt job file: %w", name, err)
 	}
+	if j.DstTemplate != "" {
+		j.DstTemplate = filepath.Clean(j.DstTemplate) // a hand-edited job must compare equal to Scan's cleaned paths
+	}
 	return j, nil
 }
 

@@ -109,7 +109,7 @@ func ValidateTemplate(t string) error {
 
 // DstFor expands the template for the given instant (UTC).
 func (j Job) DstFor(ts time.Time) string {
-	return strings.Replace(j.DstTemplate, TimestampToken, ts.UTC().Format(TimestampLayout), 1)
+	return filepath.Clean(strings.Replace(j.DstTemplate, TimestampToken, ts.UTC().Format(TimestampLayout), 1))
 }
 
 // DstParent is the directory that holds all backups of this job.

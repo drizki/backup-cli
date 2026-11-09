@@ -272,3 +272,19 @@ func TestFuncUsesTheStateDirGuard(t *testing.T) {
 		t.Fatal("removed despite the state directory guard")
 	}
 }
+
+func TestPruneComparesCleanedPaths(t *testing.T) {
+	f := newFixture(t, 1)
+	current := f.backup(1)
+	f.backup(2)
+	if err := backupset.WriteMarker(current, backupset.Marker{Job: "docs", RunID: "r", Created: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}); err != nil {
+		t.Fatal(err)
+	}
+	unclean := f.dst + "//." + "/" + filepath.Base(current)
+	if err := Prune(context.Background(), f.g, f.j, f.scan(), unclean, f.log); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(current) {
+		t.Fatalf("the backup just made was removed: %s", f.out.String())
+	}
+}

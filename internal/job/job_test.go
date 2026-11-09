@@ -123,3 +123,15 @@ func TestParseDeadline(t *testing.T) {
 		}
 	}
 }
+
+func TestDstForCleansTheTemplate(t *testing.T) {
+	j := valid()
+	j.DstTemplate = "/mnt//backup/./docs-{timestamp}"
+	ts := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+	if got := j.DstFor(ts); got != "/mnt/backup/docs-20260304T050607Z" {
+		t.Fatalf("DstFor=%s", got)
+	}
+	if j.DstParent() != "/mnt/backup" || !j.MatchesName("docs-20260304T050607Z") {
+		t.Fatalf("parent %s", j.DstParent())
+	}
+}

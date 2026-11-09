@@ -228,3 +228,23 @@ func TestEnsure(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestLoadJobCleansTheTemplate(t *testing.T) {
+	s := New(t.TempDir())
+	j := sampleJob("docs")
+	if err := s.SaveJob(j); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(s.JobPath("docs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(raw), "/mnt/backup/", "/mnt//backup/./", 1)
+	if err := os.WriteFile(s.JobPath("docs"), []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoadJob("docs")
+	if err != nil || got.DstTemplate != j.DstTemplate {
+		t.Fatalf("template %q, %v", got.DstTemplate, err)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/drizki/backup-cli/internal/cli"
 	"github.com/drizki/backup-cli/internal/exitcode"
@@ -146,5 +147,21 @@ func TestOverlapRefusedInBothDirectionsViaSymlinkAndHandEditedJob(t *testing.T) 
 	}
 	if _, err := os.Stat(filepath.Join(src, "in", "h-20260101T000000Z")); err == nil {
 		t.Error("a refused run created a backup")
+	}
+}
+
+func TestRetentionKeepsTheNewBackupWithAnUncleanTemplateAndBackwardClock(t *testing.T) {
+	f := newFixture(t)
+	f.j.DstTemplate = f.dst + "//docs-{timestamp}"
+	f.j.Keep = 1
+	f.save()
+	f.e.Retention = retention.Func(f.store.Dir)
+	f.now = baseTime.AddDate(1, 0, 0) // clock ahead
+	f.mustRun()
+	f.now = baseTime // clock corrected
+	f.step = time.Hour
+	f.mustRun()
+	if _, err := os.Lstat(f.j.DstFor(baseTime.Add(time.Hour))); err != nil {
+		t.Fatalf("the backup just made was removed by retention: %v\n%s", err, f.out.String())
 	}
 }

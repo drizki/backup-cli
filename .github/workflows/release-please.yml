@@ -1,8 +1,9 @@
 name: Release Please
 
+# Manual until the first release is ready; switch back to `push: branches: [main]`
+# when cutting v1.0.0.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 

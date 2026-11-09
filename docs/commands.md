@@ -87,15 +87,25 @@ Reports mismatches, missing files, and extra files (extra files are a warning).
 backup-cli rm <backup> [--yes] [--dry-run] [--force]
 ```
 
-Delete one committed backup through the guarded delete path.
+Delete one backup through the guarded delete path. `<backup>` is a directory or
+a `<job>/<name>` id from `list backups`. A leftover `<name>.partial` directory can
+be removed the same way (its journal must name the job).
 
 | Flag | Meaning |
 |---|---|
 | `--yes` | skip the confirmation prompt (required when stdin is not a terminal) |
-| `--dry-run` | show what would be deleted, delete nothing |
+| `--dry-run` | run every guard, print what would be deleted, delete nothing |
 | `--force` | allow deleting the last good backup of a job; all guards still apply |
 
-The prompt shows the path, size and file count.
+The prompt shows the path, the file count and the size (from the backup's
+marker). Without a terminal on stdin and without `--yes`, `rm` exits 2 and
+deletes nothing. Answer `y` or `yes` to confirm; anything else aborts with exit 0.
+
+`rm` exits 4 (refused) when a guard stops it: the last good backup without
+`--force`, a missing or foreign marker, a symlink, a path outside the job's
+destination parent, overlap with the source or the state directory, a mount
+point, or a job that no longer exists (after `job rm` the guards cannot be
+checked, so remove such backups by hand).
 
 ## job rm
 
@@ -112,7 +122,10 @@ and run history are kept.
 backup-cli doctor [--json]
 ```
 
-See [doctor](doctor.md).
+Reads only; never changes or deletes anything. Human output has one line per
+check (`ok`, `WARN`, `FAIL`); `--json` prints `{version, ok, failures, warnings,
+checks:[{name, job, severity, detail}]}`. Exit 0 when nothing failed (warnings
+still exit 0), 1 when at least one check failed. See [doctor](doctor.md).
 
 ## version, help
 
@@ -128,7 +141,7 @@ report their tag (`v1.2.3`); local builds without a tag report `dev`.
 | 1 | failed | I/O error, verification failure, unreadable file, failed doctor check |
 | 2 | usage | bad flags or arguments, invalid schedule, `rm` without `--yes` on a non-terminal |
 | 3 | partial | deadline reached; `.partial` kept and will resume |
-| 4 | refused | a safety guard stopped it: overlap, lock held, no space, unknown leftover directory, name collision, no systemd for `add` |
+| 4 | refused | a safety guard stopped it (including `rm`: last good backup, delete guards): overlap, lock held, no space, unknown leftover directory, name collision, no systemd for `add` |
 
 ## Hooks
 

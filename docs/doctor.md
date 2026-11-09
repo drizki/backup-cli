@@ -8,17 +8,24 @@ the same result with a severity per check. Exit code 0 means no failures
 
 | Check | Failure or warning means | What to do |
 |---|---|---|
-| State directory writable | cannot record runs | fix permissions, or pass `--state-dir` |
-| Source readable | the job cannot run | check the path, mount and permissions |
-| Source writable | warning: the account that runs backups can modify the source | prefer a read-only mount or a read-only account |
-| Destination writable | cannot write backups | check mount and permissions |
-| Free space | less than `keep + 1` backups fit | free space, lower `--keep`, or use a larger disk |
-| ZFS block cloning | warning when `zfs_bclone_enabled` is on | cloning can make copies share blocks below the filesystem; set the module parameter to 0 if you need physically separate copies |
-| systemd and timers | systemd missing, or a job's timer not enabled | install systemd, or use cron; re-run `add` |
-| Last run | last run failed, partial or is old | read its log with `backup-cli tail <run-id>` |
-| Leftover `.partial` | an interrupted run left a directory | run the job again to resume it; doctor never deletes it |
-| Stale locks | lock file present but not held | safe to ignore; a new run reuses it |
-| Version | reports the binary version | include it in bug reports |
+| state directory | fail: not writable or not a directory, so runs cannot be recorded; warn: it does not exist yet | fix permissions, or pass `--state-dir` |
+| systemd | warn: systemd is not available | use cron; see [scheduling](scheduling.md) |
+| zfs block cloning | warn when `zfs_bclone_enabled` is `1`; ok when `0` or when the parameter does not exist | cloning can make copies share blocks below the filesystem; set the module parameter to 0 if you need physically separate copies |
+| source readable | fail: the job cannot run | check the path, mount and permissions |
+| source writable | warn: the account that runs backups can modify the source | prefer a read-only mount or a read-only account |
+| overlap | fail: source and destination overlap (for example a hand-edited job file) | fix the job; `run` would refuse it |
+| destination writable | fail: cannot write backups | check mount and permissions |
+| destination mount | warn: the destination is on the root filesystem or not in the mount table | check that the backup disk is mounted |
+| backups | the number of committed backups | |
+| free space | fail: less than `keep + 1` backups of the newest backup's size fit (counting those already stored); ok when there is no backup yet | free space, lower `--keep`, or use a larger disk |
+| leftover partial | warn: an interrupted run left a `.partial` directory | run the job again to resume it, or remove it with `rm`; doctor never deletes it |
+| unrecognized directories | warn: directories matching the job's template that are not committed backups (no marker, bad marker, another job's marker) | they are never pruned or touched; inspect or remove them by hand |
+| last run | fail: the last run failed; warn: partial, refused, never run (scheduled jobs), finished more than 40 days ago, or recorded as running although its process is gone | read its log with `backup-cli tail <run-id>` |
+| lock | warn: the lock is held but the recorded pid is not running, or a crashed run left a lock file naming a dead pid | the lock file is kept after every run and a free lock is normal; a new run reuses it |
+| timer | warn: a scheduled job's timer is not active, or systemd is missing | `systemctl enable --now backup-cli-<job>.timer`, or add the job again |
+| version | reports the binary version | include it in bug reports |
+
+Checks that depend on a job are listed once per job.
 
 ## Common situations
 

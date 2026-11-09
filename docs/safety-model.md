@@ -27,25 +27,37 @@ repository test fails if deletion calls appear anywhere else. Before removing a
 backup it checks that:
 
 - the directory contains a valid marker whose job matches the job being acted on;
-- the target is strictly inside the job's destination parent (not the parent
-  itself, no `..` escapes, no symlinked components);
+- the target is an absolute path with no `..` element, is directly inside the
+  job's destination parent spelled exactly as the job spells it (the parent
+  itself, other locations and paths through a symlinked alias are refused), and
+  its name matches the job's destination template;
 - the target does not equal, contain, or sit inside the job's source, including
-  through symlinks;
-- the target is not `/`, not the state directory or anything inside it, and not a
-  mount point;
+  through symlinks and by inode (which also catches bind-style aliases);
+- the target is not `/`, not the state directory or anything inside it (or
+  containing it), and not a mount point or the parent of one;
 - the target is not a symlink (symlinks are refused, never followed);
-- the target type did not change between the check and the removal.
+- the target is the same directory right before removal: it is opened relative
+  to a handle on its parent and re-checked (type and identity), and the removal
+  is refused if it changed after the guards ran.
 
 `.partial` directories can be removed only through a separate function that
 checks the `.partial` suffix, a journal belonging to the same job, and the same
-location rule.
+location rule. A refusal is reported as exit code 4 and leaves the tree untouched.
+
+The repository test `internal/safedelete/guard_test.go` parses every non-test Go
+file and fails on any removal call or spawned `rm` outside `safedelete`, with a
+short allowlist (each entry justified in the test): the job definition file and
+the atomic-write temp file in `state`, the unit files this tool generated in
+`systemd`, and the run's own journal file in `journal`.
 
 ## Retention is conservative
 
 Pruning runs only after a run committed and verified successfully. It never
 runs after a failed, partial, refused, skipped or dry run. It keeps the newest N
-committed backups by marker creation time, and never touches unknown
-directories in the destination parent. `keep` must be at least 1, so the last
+committed backups by marker creation time, never removes the backup the run just
+made, and never touches unknown directories in the destination parent. Each
+removal goes through the guards above; one refusal is logged as a warning and
+the other old backups are still considered. `keep` must be at least 1, so the last
 good backup is never pruned. `rm` refuses to delete the last good backup unless
 `--force` is given, and `--force` still obeys every guard above.
 

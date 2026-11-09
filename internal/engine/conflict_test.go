@@ -3,13 +3,11 @@ package engine
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/drizki/backup-cli/internal/cli"
 	"github.com/drizki/backup-cli/internal/exitcode"
-	"github.com/drizki/backup-cli/internal/state"
 )
 
 func TestMissingPreviousCopyFallsBackToTheSource(t *testing.T) {
@@ -71,7 +69,7 @@ func TestResumeReplacesAStaleSymlinkAtomically(t *testing.T) {
 	f.sameAsSource(f.latest())
 }
 
-func TestResumeTypeConflictFailsWithoutDeleting(t *testing.T) {
+func TestResumeReplacesAnObjectOfTheWrongType(t *testing.T) {
 	f, part := interrupted(t)
 	conflict := filepath.Join(part, "empty")
 	if err := os.Remove(conflict); err != nil { // an empty directory made by the interrupted run
@@ -80,13 +78,10 @@ func TestResumeTypeConflictFailsWithoutDeleting(t *testing.T) {
 	if err := os.Symlink(f.root, conflict); err != nil { // a symlink where a directory belongs
 		t.Fatal(err)
 	}
-	err := f.run()
-	f.expectCode(exitcode.Failed, err)
-	if fi, lerr := os.Lstat(conflict); lerr != nil || fi.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("the conflicting object must be left in place")
-	}
-	if st := f.lastStatus(); st.State != state.StateFailed || !strings.Contains(strings.Join(st.Errors, " "), "empty") {
-		t.Fatalf("%+v", st)
+	f.mustRun()
+	f.sameAsSource(f.latest())
+	if _, err := os.Stat(f.path("a.txt")); err != nil {
+		t.Fatalf("the symlink's target was touched: %v", err)
 	}
 }
 

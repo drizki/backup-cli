@@ -69,7 +69,7 @@ func (f *fixture) partial(name, jobName string) string {
 	dir := filepath.Join(f.dst, name)
 	mkdir(f.t, dir)
 	write(f.t, filepath.Join(dir, "half.bin"), "half")
-	jr, err := journal.Open(filepath.Join(dir, journal.Name), jobName, "r1")
+	jr, err := journal.Open(filepath.Join(dir, journal.Name), jobName, "r1", time.Time{})
 	if err != nil {
 		f.t.Fatal(err)
 	}

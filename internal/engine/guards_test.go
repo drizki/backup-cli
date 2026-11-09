@@ -150,7 +150,7 @@ func TestUnknownPartialDirectoriesAreNeverReused(t *testing.T) {
 			}
 		},
 		"other job": func(t *testing.T, _ *fixture, dir string) {
-			jr, err := journal.Open(filepath.Join(dir, journal.Name), "someone-else", "r")
+			jr, err := journal.Open(filepath.Join(dir, journal.Name), "someone-else", "r", time.Time{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -162,9 +162,9 @@ func TestUnknownPartialDirectoriesAreNeverReused(t *testing.T) {
 			}
 		},
 		"corrupt journal": func(t *testing.T, _ *fixture, dir string) {
-			a, _ := journal.Open(filepath.Join(dir, journal.Name), "x", "r")
+			a, _ := journal.Open(filepath.Join(dir, journal.Name), "x", "r", time.Time{})
 			_ = a.Close()
-			b, _ := journal.Open(filepath.Join(dir, journal.Name), "y", "r")
+			b, _ := journal.Open(filepath.Join(dir, journal.Name), "y", "r", time.Time{})
 			_ = b.Close()
 		},
 	}

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/drizki/backup-cli/internal/backupset"
 	"github.com/drizki/backup-cli/internal/copyx"
@@ -22,6 +23,9 @@ import (
 // the marker, then directory metadata, fsync, an atomic rename and an fsync
 // of the parent. Only a renamed directory carrying the marker is committed.
 func (r *run) commit(p *plan) error {
+	if err := r.sweep(p); err != nil { // nothing outside the plan may be committed
+		return err
+	}
 	sum, err := writeManifests(p.partialDir, p.entries)
 	if err != nil {
 		return exitcode.Failedf("write manifests: %v", err)
@@ -34,7 +38,7 @@ func (r *run) commit(p *plan) error {
 		}
 	}
 	err = backupset.WriteMarker(p.partialDir, backupset.Marker{
-		Job: r.j.Name, RunID: r.id, ToolVersion: version.Version, Created: r.e.now().UTC(),
+		Job: r.j.Name, RunID: r.id, ToolVersion: version.Version, Created: r.e.now().UTC(), Started: r.backupStarted(p),
 		Source: r.j.Source, FileCount: files, Bytes: bytes, ManifestSHA256: sum,
 	})
 	if err != nil {
@@ -55,6 +59,17 @@ func (r *run) commit(p *plan) error {
 	}
 	r.log.Infof("committed %s: %d file(s), %d byte(s)", r.finalDir, files, bytes)
 	return nil
+}
+
+// backupStarted is when the backup began: the first run start of a resumed
+// partial, else this run's start. The next run treats files modified since
+// then as changed.
+func (r *run) backupStarted(p *plan) time.Time {
+	s := r.start.UTC()
+	if first := p.replay.Started; !first.IsZero() && first.Before(s) {
+		s = first.UTC()
+	}
+	return s
 }
 
 // writeManifests writes both manifests with fsync and returns the SHA-256 of

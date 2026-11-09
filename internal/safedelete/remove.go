@@ -75,3 +75,75 @@ func openUp(root *os.Root, rel string) {
 		}
 	}
 }
+
+// SweepPartial removes from the partial backup directory dir every entry that
+// is not in want or whose type differs, and returns their slash-separated
+// paths. want maps a path below dir to its type bits (fs.ModeDir,
+// fs.ModeSymlink, or 0 for a regular file); keep names top-level entries to
+// leave alone. The caller must already have proven that dir is its own
+// partial directory. Removal is confined to dir through an os.Root.
+func SweepPartial(dir string, want map[string]fs.FileMode, keep ...string) ([]string, error) {
+	if fi, err := os.Lstat(dir); err == nil && fi.IsDir() && fi.Mode().Perm()&0o700 != 0o700 {
+		_ = os.Chmod(dir, fi.Mode().Perm()|0o700) // a crash after the final chmod may have locked it
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+	s := sweeper{root: root, want: want, keep: keep}
+	if err := s.dir("."); err != nil {
+		return s.removed, err
+	}
+	return s.removed, nil
+}
+
+type sweeper struct {
+	root    *os.Root
+	want    map[string]fs.FileMode
+	keep    []string
+	removed []string
+}
+
+func (s *sweeper) dir(rel string) error {
+	openUp(s.root, rel) // a crashed run may have left read-only directories
+	d, err := s.root.Open(rel)
+	if err != nil {
+		return err
+	}
+	items, err := d.ReadDir(-1)
+	_ = d.Close()
+	if err != nil {
+		return err
+	}
+	for _, it := range items {
+		if err := s.entry(rel, it); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *sweeper) entry(parent string, it fs.DirEntry) error {
+	rel := path.Join(parent, it.Name())
+	if parent == "." {
+		for _, k := range s.keep {
+			if k == it.Name() {
+				return nil
+			}
+		}
+	}
+	typ := it.Type() & fs.ModeType
+	if t, planned := s.want[rel]; planned && t == typ {
+		if typ == fs.ModeDir {
+			return s.dir(rel)
+		}
+		return nil
+	}
+	openUp(s.root, rel)
+	if err := s.root.RemoveAll(rel); err != nil {
+		return err
+	}
+	s.removed = append(s.removed, rel)
+	return nil
+}

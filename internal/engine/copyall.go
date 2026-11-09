@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +27,9 @@ type copier struct {
 	kept   atomic.Int64
 	failMu sync.Mutex
 	failed error
+	// dropped marks entries (by index) whose source vanished; each index is
+	// written by at most one worker.
+	dropped []bool
 }
 
 func (r *run) copyAll(ctx context.Context, p *plan) error {
@@ -34,7 +38,7 @@ func (r *run) copyAll(ctx context.Context, p *plan) error {
 			return exitcode.Failedf("create %s: %v", p.partialDir, err)
 		}
 	}
-	jr, err := journal.Open(filepath.Join(p.partialDir, journal.Name), r.j.Name, r.id)
+	jr, err := journal.Open(filepath.Join(p.partialDir, journal.Name), r.j.Name, r.id, r.start)
 	if err != nil {
 		return exitcode.Failedf("journal: %v", err)
 	}
@@ -44,24 +48,64 @@ func (r *run) copyAll(ctx context.Context, p *plan) error {
 		return exitcode.Failedf("open source: %v", err)
 	}
 	defer func() { _ = srcRoot.Close() }()
-	c := &copier{r: r, p: p, jr: jr, chown: copyx.IsRoot()}
+	c := &copier{r: r, p: p, jr: jr, chown: copyx.IsRoot(), dropped: make([]bool, len(p.entries))}
 	c.src = r.e.sourceOpener(srcRoot)
 	closePrev, err := c.openPrevRoot()
 	if err != nil {
 		return err
 	}
 	defer closePrev()
+	err = c.work(ctx)
+	c.stopJournal(err)
+	return err
+}
+
+// work sweeps a resumed partial, builds the tree and copies the files.
+func (c *copier) work(ctx context.Context) error {
+	if c.p.resumed {
+		if err := c.r.sweep(c.p); err != nil {
+			return err
+		}
+	}
 	if err := c.makeTree(ctx); err != nil {
 		return err
 	}
-	err = c.copyFiles(ctx)
+	err := c.copyFiles(ctx)
 	if kept := c.kept.Load(); kept > 0 {
-		r.log.Infof("resume: kept %d verified file(s) from the partial backup", kept)
+		c.r.log.Infof("resume: kept %d journaled file(s) from the partial backup", kept)
 	}
 	if err != nil {
-		_ = jr.Sync()
+		return err
 	}
-	return err
+	c.p.entries = c.live()
+	return nil
+}
+
+// live returns the plan's entries without the ones whose source vanished.
+func (c *copier) live() []manifest.Entry {
+	out := make([]manifest.Entry, 0, len(c.p.entries))
+	for i, e := range c.p.entries {
+		if !c.dropped[i] {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// stopJournal flushes the journal. A stop by deadline or signal is recorded as
+// clean, which lets the next run trust this session's files without
+// re-hashing them; a failure or a kill leaves no such record.
+func (c *copier) stopJournal(err error) {
+	if err == nil {
+		return
+	}
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		_ = c.jr.Sync()
+		return
+	}
+	if cerr := c.jr.CleanStop(); cerr != nil {
+		c.r.log.Warnf("journal: could not record the clean stop: %v", cerr)
+	}
 }
 
 func (e *Engine) sourceOpener(root *os.Root) func(string) (*os.File, error) {

@@ -16,7 +16,8 @@ one backup cannot affect another.
 
 ## Commit protocol
 
-Work happens in `<dst>.partial`. The order at the end is: manifests, marker,
+Work happens in `<dst>.partial`. The order at the end is: remove anything the
+plan does not contain, manifests, marker,
 fsync of files and directory, atomic rename, fsync of the parent. Only a
 renamed directory with a valid marker is a committed backup.
 
@@ -39,6 +40,16 @@ backup it checks that:
 - the target is the same directory right before removal: it is opened relative
   to a handle on its parent and re-checked (type and identity), and the removal
   is refused if it changed after the guards ran.
+
+Deleting a backup removes its marker first (and syncs the directory), after
+making read-only directories owner-writable, so a deletion that is cut short
+never leaves a tree that still looks committed.
+
+A run also removes, inside its own proven `.partial` directory only, entries
+that are not part of its plan (leftovers of an interrupted run, objects of the
+wrong type). That removal is the `SweepPartial` function of the same package; it
+works through a handle on the directory, never follows symlinks and leaves the
+journal alone.
 
 `.partial` directories can be removed only through a separate function that
 checks the `.partial` suffix, a journal belonging to the same job, and the same

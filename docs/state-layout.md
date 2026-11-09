@@ -62,6 +62,7 @@ atomically (temp file, fsync, rename).
   "bytes_total": 0,
   "bytes_from_source": 0,
   "warnings": [],
+  "warnings_total": 0,
   "errors": [],
   "exit_code": 0,
   "refuse_reason": "",
@@ -69,6 +70,9 @@ atomically (temp file, fsync, rename).
   "log": "runs/20260101T023000Z-data-a1b2/run.log"
 }
 ```
+
+`warnings` holds the first 100 warnings only; `warnings_total` counts all of them
+and `run.log` has every one.
 
 `state` is one of `running`, `succeeded`, `partial`, `failed`, `refused`,
 `skipped`. The file is rewritten at start, on every state change, and on a 5
@@ -86,8 +90,8 @@ systemd the same lines also go to stdout (and the journal).
 ```
 
 `MANIFEST.sha256`: `<hex>  ./relative/path`, compatible with `sha256sum -c`. Names
-with newlines or backslashes use GNU escaping (line starts with `\`, with `\\`
-and `\n` escapes).
+with newlines, carriage returns or backslashes use GNU escaping (line starts with
+`\`, with `\\`, `\n` and `\r` escapes).
 
 `MANIFEST.tsv`: a header and one row per entry:
 `path`, `type`, `size`, `mtime_ns`, `mode` (octal), `uid`, `gid`, `sha256`,
@@ -103,6 +107,7 @@ are percent-escaped. Directories and symlinks are included with sha256 `-`.
   "run_id": "20260101T023000Z-data-a1b2",
   "tool_version": "v1.0.0",
   "created": "2026-01-01T02:41:12Z",
+  "started": "2026-01-01T02:30:00Z",
   "source": "/srv/data",
   "file_count": 1000,
   "bytes": 0,
@@ -113,5 +118,6 @@ are percent-escaped. Directories and symlinks are included with sha256 `-`.
 ## Partial directory
 
 `<dst>.partial/` holds the in-progress copy plus `.backup-cli-partial.jsonl`, an
-append-only journal: the job, the run id, and one entry per completed file
-(size, mtime, sha256), appended after the file is fsynced.
+append-only journal: a header per session (job, run id, start time), one entry
+per completed file (size, mtime, sha256) appended after the file is fsynced, and
+a `clean-stop` record when a session ended by deadline or signal.

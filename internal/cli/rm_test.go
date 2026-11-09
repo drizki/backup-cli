@@ -190,7 +190,7 @@ func TestRmPartialDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.expectCode(exitcode.Refused, "rm", "--yes", part) // no journal
-	jr, err := journal.Open(filepath.Join(part, journal.Name), "one", "r1")
+	jr, err := journal.Open(filepath.Join(part, journal.Name), "one", "r1", time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

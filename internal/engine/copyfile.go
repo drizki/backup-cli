@@ -4,56 +4,100 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/drizki/backup-cli/internal/copyx"
 	"github.com/drizki/backup-cli/internal/exitcode"
 	"github.com/drizki/backup-cli/internal/journal"
+	"github.com/drizki/backup-cli/internal/walk"
 )
+
+// errVanished means a file's source disappeared (or became something other
+// than a regular file) after the tree was listed.
+var errVanished = errors.New("source vanished")
 
 // copyOne makes one file present, correct and journaled in the partial
 // directory: kept from an earlier attempt, copied from the previous backup,
-// or copied from the source.
+// or copied from the source. A file that vanished from the source is dropped
+// from the plan with a warning.
 func (c *copier) copyOne(ctx context.Context, buf []byte, f fileJob) error {
 	e := &c.p.entries[f.idx]
 	dst := filepath.Join(c.p.partialDir, filepath.FromSlash(e.Path))
-	switch {
-	case c.keepJournaled(ctx, buf, e.Path, dst, f):
+	kept, trusted := c.keepJournaled(ctx, buf, e.Path, dst, f)
+	if kept {
 		c.kept.Add(1)
-	case f.prevSHA != "" && c.fromPrev(ctx, buf, f, dst):
-		c.r.fromPrev.Add(1)
-	default:
-		if err := c.fromSource(ctx, buf, f, dst); err != nil {
+	} else if err := c.copyNew(ctx, buf, f, dst); err != nil {
+		if !errors.Is(err, errVanished) {
 			return err
 		}
-		c.r.fromSource.Add(1)
-		c.r.srcBytes.Add(e.Size)
+		c.dropped[f.idx] = true
+		c.done.Add(1)
+		c.r.warn("%s vanished while the backup was running; it is not in this backup", e.Path)
+		return nil
 	}
 	c.done.Add(1)
+	if trusted { // already journaled by a session that stopped cleanly
+		return nil
+	}
 	if err := c.jr.Add(journal.Entry{Path: e.Path, Size: e.Size, MtimeNS: e.MtimeNS, SHA256: e.SHA256}); err != nil {
 		return exitcode.Failedf("journal: %v", err)
 	}
 	return nil
 }
 
-// keepJournaled reuses a file completed by an interrupted run, after
-// re-hashing it and re-applying its metadata.
-func (c *copier) keepJournaled(ctx context.Context, buf []byte, rel, dst string, f fileJob) bool {
-	je, ok := c.p.replay[rel]
-	e := &c.p.entries[f.idx]
-	if !ok || je.Size != e.Size || je.MtimeNS != e.MtimeNS {
-		return false
+// copyNew copies a file from the previous backup or, failing that, the source.
+func (c *copier) copyNew(ctx context.Context, buf []byte, f fileJob, dst string) error {
+	if f.prevSHA != "" && c.fromPrev(ctx, buf, f, dst) {
+		c.r.fromPrev.Add(1)
+		return nil
 	}
-	size, sum, err := copyx.HashFile(ctx, dst, buf)
-	if err != nil || size != je.Size || sum != je.SHA256 {
-		c.r.log.Warnf("resume: %s did not verify; copying it again", rel)
-		return false
+	if err := c.fromSource(ctx, buf, f, dst); err != nil {
+		return err
+	}
+	c.r.fromSource.Add(1)
+	c.r.srcBytes.Add(c.p.entries[f.idx].Size)
+	return nil
+}
+
+// keepJournaled reuses a file completed by an interrupted run and re-applies
+// its metadata. A file journaled by a session that stopped cleanly is trusted
+// when its size and mtime still match (it was fsynced before it was
+// journaled); anything else is re-hashed first. trusted tells the caller the
+// journal already holds a good entry.
+func (c *copier) keepJournaled(ctx context.Context, buf []byte, rel, dst string, f fileJob) (kept, trusted bool) {
+	je, ok := c.p.replay.Entries[rel]
+	e := &c.p.entries[f.idx]
+	if !ok || je.Size != e.Size || je.MtimeNS != e.MtimeNS || racy(e.MtimeNS, c.p.replay.Started) {
+		return false, false
+	}
+	trusted = c.p.replay.Trusted(rel) && sameOnDisk(dst, je)
+	if !trusted && !c.rehash(ctx, buf, rel, dst, je) {
+		return false, false
 	}
 	if err := copyx.Apply(dst, metaOf(*e), c.chown); err != nil {
-		return false
+		return false, false
 	}
-	e.SHA256 = sum
-	return true
+	e.SHA256 = je.SHA256
+	return true, trusted
+}
+
+// sameOnDisk reports whether dst is a regular file with the journaled size
+// and mtime.
+func sameOnDisk(dst string, je journal.Entry) bool {
+	fi, err := os.Lstat(dst)
+	return err == nil && fi.Mode().IsRegular() && fi.Size() == je.Size && fi.ModTime().UnixNano() == je.MtimeNS
+}
+
+func (c *copier) rehash(ctx context.Context, buf []byte, rel, dst string, je journal.Entry) bool {
+	size, sum, err := copyx.HashFile(ctx, dst, buf)
+	if err == nil && size == je.Size && sum == je.SHA256 {
+		return true
+	}
+	if ctx.Err() == nil {
+		c.r.log.Warnf("resume: %s did not verify; copying it again", rel)
+	}
+	return false
 }
 
 // fromPrev copies an unchanged file from the previous backup and checks it
@@ -113,6 +157,9 @@ func (c *copier) fromSource(ctx context.Context, buf []byte, f fileJob, dst stri
 
 func (c *copier) copySourceOnce(ctx context.Context, buf []byte, rel, dst string) (copyx.FileResult, error) {
 	src, err := c.src(rel)
+	if walk.Vanished(err) {
+		return copyx.FileResult{}, errVanished
+	}
 	if err != nil {
 		return copyx.FileResult{}, exitcode.Failedf("read %s: %v", rel, err)
 	}
@@ -127,6 +174,9 @@ func (c *copier) copySourceOnce(ctx context.Context, buf []byte, rel, dst string
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return res, err
+	}
+	if errors.Is(err, copyx.ErrNotRegular) {
+		return res, errVanished
 	}
 	return res, exitcode.With(exitcode.Failed, fmt.Errorf("%s: %w", rel, err))
 }

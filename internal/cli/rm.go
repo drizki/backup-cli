@@ -75,6 +75,10 @@ func (a *app) rm(arg string, o rmOptions) error {
 		_, _ = fmt.Fprintln(a.out(), "dry run: nothing was deleted")
 		return nil
 	}
+	return a.confirmAndRemove(store, g, j, plan, o)
+}
+
+func (a *app) confirmAndRemove(store state.Store, g safedelete.Guard, j job.Job, plan safedelete.Plan, o rmOptions) error {
 	if !o.yes && !a.confirm() {
 		_, _ = fmt.Fprintln(a.out(), "aborted: nothing was deleted")
 		return nil

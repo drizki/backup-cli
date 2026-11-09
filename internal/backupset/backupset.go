@@ -38,6 +38,7 @@ type Marker struct {
 	RunID          string    `json:"run_id"`
 	ToolVersion    string    `json:"tool_version"`
 	Created        time.Time `json:"created"`
+	Started        time.Time `json:"started,omitzero"` // when the run began; the first run start for a resumed backup
 	Source         string    `json:"source"`
 	FileCount      int64     `json:"file_count"`
 	Bytes          int64     `json:"bytes"`

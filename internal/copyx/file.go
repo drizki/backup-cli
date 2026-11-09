@@ -2,10 +2,15 @@ package copyx
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
 )
+
+// ErrNotRegular means the file to copy is not a regular file (it was replaced
+// by a directory or another object after the tree was listed).
+var ErrNotRegular = errors.New("not a regular file")
 
 // FileOpts controls CopyFile.
 type FileOpts struct {
@@ -36,6 +41,9 @@ func CopyFile(ctx context.Context, dstPath string, src *os.File, o FileOpts) (Fi
 	before, err := src.Stat()
 	if err != nil {
 		return FileResult{}, err
+	}
+	if !before.Mode().IsRegular() {
+		return FileResult{}, ErrNotRegular
 	}
 	dst, err := os.OpenFile(dstPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|noFollow, 0o600)
 	if err != nil {

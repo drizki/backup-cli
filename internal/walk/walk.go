@@ -4,11 +4,13 @@ package walk
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"syscall"
 
 	"github.com/drizki/backup-cli/internal/copyx"
 	"github.com/drizki/backup-cli/internal/manifest"
@@ -25,12 +27,19 @@ type Skipped struct {
 type Result struct {
 	Entries []manifest.Entry
 	Skipped []Skipped
-	Files   int64
-	Bytes   int64 // sum of regular file sizes
+	// Vanished lists paths that disappeared or changed type while the tree
+	// was being walked; they are left out of Entries.
+	Vanished []string
+	Files    int64
+	Bytes    int64 // sum of regular file sizes
+
+	beforeList func(dir string) // tests change the tree just before a directory is listed
 }
 
 // Walk lists root. Any unreadable directory or entry is an error: a backup
-// that silently omits data is worse than a failed one.
+// that silently omits data is worse than a failed one. An entry that vanishes
+// during the walk (deleted, or replaced by an object of another type) is not
+// an error; it is reported in Result.Vanished.
 func Walk(ctx context.Context, root string) (Result, error) {
 	var res Result
 	fi, err := os.Stat(root)
@@ -45,6 +54,9 @@ func Walk(ctx context.Context, root string) (Result, error) {
 }
 
 func walkDir(ctx context.Context, abs, rel string, res *Result) error {
+	if res.beforeList != nil {
+		res.beforeList(abs)
+	}
 	items, err := os.ReadDir(abs)
 	if err != nil {
 		return err
@@ -53,24 +65,40 @@ func walkDir(ctx context.Context, abs, rel string, res *Result) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		fi, err := it.Info()
-		if err != nil {
-			return err
-		}
 		childRel := path.Join(rel, it.Name())
-		childAbs := filepath.Join(abs, it.Name())
-		if fi.IsDir() {
-			res.Entries = append(res.Entries, entryOf(childRel, manifest.TypeDir, fi))
-			if err := walkDir(ctx, childAbs, childRel, res); err != nil {
+		if err := res.visit(ctx, filepath.Join(abs, it.Name()), childRel, it); err != nil {
+			if !Vanished(err) {
 				return err
 			}
-			continue
-		}
-		if err := res.add(childAbs, childRel, fi); err != nil {
-			return err
+			res.Vanished = append(res.Vanished, childRel)
 		}
 	}
 	return nil
+}
+
+// visit adds one directory entry (and, for a directory, its subtree). When a
+// directory vanishes before it can be listed, its entry is taken back and the
+// error returned.
+func (res *Result) visit(ctx context.Context, abs, rel string, it fs.DirEntry) error {
+	fi, err := it.Info()
+	if err != nil {
+		return err
+	}
+	if !fi.IsDir() {
+		return res.add(abs, rel, fi)
+	}
+	res.Entries = append(res.Entries, entryOf(rel, manifest.TypeDir, fi))
+	err = walkDir(ctx, abs, rel, res)
+	if Vanished(err) { // only the directory's own listing can fail this way: nothing below it was added
+		res.Entries = res.Entries[:len(res.Entries)-1]
+	}
+	return err
+}
+
+// Vanished reports whether err means the object disappeared or changed type
+// (deleted, or replaced by a file where a directory was expected).
+func Vanished(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.Is(err, syscall.ELOOP) || errors.Is(err, syscall.EISDIR)
 }
 
 func (res *Result) add(abs, rel string, fi fs.FileInfo) error {

@@ -26,7 +26,7 @@ func (r *run) report(p *plan) {
 	_, _ = fmt.Fprintf(w, "  new backup:        %s\n", r.finalDir)
 	_, _ = fmt.Fprintf(w, "  previous backup:   %s\n", prev)
 	if p.resumed {
-		_, _ = fmt.Fprintf(w, "  resumes partial:   %s (%d journaled file(s) would be re-verified)\n", p.partialDir, len(p.replay))
+		_, _ = fmt.Fprintf(w, "  resumes partial:   %s (%d journaled file(s); re-hashed unless the last stop was clean)\n", p.partialDir, len(p.replay.Entries))
 	}
 	_, _ = fmt.Fprintf(w, "  copy from source:  %d file(s), %s\n", p.srcCount, space.Format(uint64(p.srcBytes)))
 	_, _ = fmt.Fprintf(w, "  copy from previous backup: %d file(s), %s\n", p.prevCount, space.Format(uint64(p.prevBytes)))

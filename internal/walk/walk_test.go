@@ -173,3 +173,65 @@ func TestWalkUnreadableDirectoryFails(t *testing.T) {
 		t.Fatal("unreadable directory silently skipped")
 	}
 }
+
+func TestWalkSkipsEntriesThatVanishDuringTheWalk(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "a-first", "b.txt"), "b")
+	mustWrite(t, filepath.Join(root, "b-vanishing", "inner.txt"), "i")
+	mustWrite(t, filepath.Join(root, "c-keep.txt"), "k")
+	mustWrite(t, filepath.Join(root, "z-gone.txt"), "g")
+	mustWrite(t, filepath.Join(root, "z-gonedir", "inner.txt"), "i")
+	mustWrite(t, filepath.Join(root, "z-swapped", "inner.txt"), "i")
+	var res Result
+	res.beforeList = func(dir string) {
+		switch dir {
+		case filepath.Join(root, "a-first"): // the later siblings are listed already
+			must(t, os.Remove(filepath.Join(root, "z-gone.txt")))
+			must(t, os.RemoveAll(filepath.Join(root, "z-gonedir")))
+			must(t, os.RemoveAll(filepath.Join(root, "z-swapped")))
+			mustWrite(t, filepath.Join(root, "z-swapped"), "now a file")
+		case filepath.Join(root, "b-vanishing"):
+			must(t, os.RemoveAll(dir))
+		}
+	}
+	if err := walkDir(context.Background(), root, "", &res); err != nil {
+		t.Fatal(err)
+	}
+	m := byPath(res)
+	for _, want := range []string{"a-first", "a-first/b.txt", "c-keep.txt", "z-swapped"} { // z-swapped is a plain file now
+		if _, ok := m[want]; !ok {
+			t.Errorf("%s missing", want)
+		}
+	}
+	for _, gone := range []string{"b-vanishing", "b-vanishing/inner.txt", "z-gone.txt", "z-gonedir", "z-swapped/inner.txt"} {
+		if _, ok := m[gone]; ok {
+			t.Errorf("%s kept although it vanished", gone)
+		}
+	}
+	if len(res.Vanished) != 3 {
+		t.Errorf("vanished %v, want 3 paths", res.Vanished)
+	}
+	if res.Files != 3 {
+		t.Errorf("files %d, want 3", res.Files)
+	}
+}
+
+func TestVanishedClassification(t *testing.T) {
+	for _, err := range []error{os.ErrNotExist, syscall.ENOENT, syscall.ENOTDIR, syscall.ELOOP, syscall.EISDIR} {
+		if !Vanished(err) {
+			t.Errorf("%v not classed as vanished", err)
+		}
+	}
+	for _, err := range []error{nil, os.ErrPermission, syscall.EIO, syscall.EACCES} {
+		if Vanished(err) {
+			t.Errorf("%v classed as vanished", err)
+		}
+	}
+}
+
+func must(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}

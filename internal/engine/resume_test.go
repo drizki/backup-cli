@@ -68,7 +68,7 @@ func TestInterruptedRunResumesToTheSameResultAsACleanRun(t *testing.T) {
 	}
 }
 
-func TestResumeReverifiesJournaledFiles(t *testing.T) {
+func TestResumeAfterAnUncleanStopReverifiesJournaledFiles(t *testing.T) {
 	f := newFixture(t)
 	f.step = 0
 	ctx := f.interruptAfter(4)
@@ -79,6 +79,7 @@ func TestResumeReverifiesJournaledFiles(t *testing.T) {
 	for p := range rep.Entries {
 		victim = p
 	}
+	forgetCleanStop(t, part)                                     // as if the run had been killed instead of stopped
 	flipByte(t, filepath.Join(part, filepath.FromSlash(victim))) // corrupt a journaled file
 	f.e.AfterCopy = nil
 	f.mustRun()
@@ -256,4 +257,91 @@ func TestGrowingFileIsDetected(t *testing.T) {
 	if st := f.lastStatus(); !hasWarning(st, "unstable: a.txt") {
 		t.Fatalf("%+v", st)
 	}
+}
+
+// forgetCleanStop rewrites the partial's journal without its clean-stop
+// records, which is what a SIGKILL or a power loss leaves behind.
+func forgetCleanStop(t *testing.T, part string) {
+	t.Helper()
+	path := filepath.Join(part, journal.Name)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var keep []string
+	for _, l := range strings.Split(string(raw), "\n") {
+		if !strings.Contains(l, `"t":"s"`) {
+			keep = append(keep, l)
+		}
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(keep, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// After a clean stop (deadline or signal) the journaled files were fsynced by
+// this tool, so a resume trusts them by size and mtime. Corrupting one without
+// changing either proves that no hash was computed.
+func TestResumeAfterACleanStopTrustsJournaledFilesWithoutHashing(t *testing.T) {
+	f := newFixture(t)
+	f.step = 0
+	ctx := f.interruptAfter(4)
+	f.expectCode(exitcode.Partial, f.runCtx(ctx, func(r *cli.EngineRequest) { r.Jobs = 1 }))
+	part := f.partials()[0]
+	rep, _ := journal.Read(filepath.Join(part, journal.Name))
+	var victim string
+	for p, e := range rep.Entries {
+		if e.Size > 0 && rep.Trusted(p) {
+			victim = p
+		}
+	}
+	if victim == "" {
+		t.Fatal("the clean stop was not recorded")
+	}
+	flipByte(t, filepath.Join(part, filepath.FromSlash(victim)))
+	f.e.AfterCopy = nil
+	f.mustRun(func(r *cli.EngineRequest) { r.VerifySample = 0 }) // the sample verify could pick the tampered file
+	if strings.Contains(f.out.String(), "did not verify") {
+		t.Errorf("a trusted file was re-hashed:\n%s", f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "resume: kept 4 journaled") {
+		t.Errorf("the journaled files were not kept:\n%s", f.out.String())
+	}
+}
+
+func TestResumeAfterACleanStopStillChecksSizeAndMtime(t *testing.T) {
+	f := newFixture(t)
+	f.step = 0
+	ctx := f.interruptAfter(4)
+	f.expectCode(exitcode.Partial, f.runCtx(ctx, func(r *cli.EngineRequest) { r.Jobs = 1 }))
+	part := f.partials()[0]
+	rep, _ := journal.Read(filepath.Join(part, journal.Name))
+	var victim string
+	for p := range rep.Entries {
+		victim = p
+	}
+	if err := os.WriteFile(filepath.Join(part, filepath.FromSlash(victim)), []byte("short"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.e.AfterCopy = nil
+	f.mustRun()
+	f.sameAsSource(f.latest())
+}
+
+// Repeated deadline runs must make progress: a resume keeps the files of a
+// clean stop, so the second window is spent on new data, not on hashing.
+func TestDeadlineRunsConvergeWithoutRehashing(t *testing.T) {
+	f := newFixture(t)
+	f.step = 0
+	for _, stopAfter := range []int64{2, 2} {
+		ctx := f.interruptAfter(stopAfter)
+		f.expectCode(exitcode.Partial, f.runCtx(ctx, func(r *cli.EngineRequest) { r.Jobs = 1 }))
+	}
+	f.e.AfterCopy = nil
+	f.out.Reset()
+	f.mustRun()
+	if !strings.Contains(f.out.String(), "resume: kept 4 journaled") {
+		t.Errorf("earlier windows' files were not kept:\n%s", f.out.String())
+	}
+	f.sameAsSource(f.latest())
 }

@@ -9,8 +9,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/drizki/backup-cli/internal/backupset"
 	"github.com/drizki/backup-cli/internal/exitcode"
@@ -43,7 +45,7 @@ type plan struct {
 	prev       *prevBackup
 	partialDir string
 	resumed    bool
-	replay     map[string]journal.Entry
+	replay     journal.Replay
 	needBytes  uint64
 	freeBytes  uint64
 	removed    int // paths of the previous backup that no longer exist
@@ -70,6 +72,9 @@ func (r *run) prepare(ctx context.Context) (*plan, error) {
 	}
 	p.entries, p.skipped = res.Entries, res.Skipped
 	describeSkipped(r, p)
+	for _, v := range res.Vanished {
+		r.warn("%s vanished while the tree was being listed; it is not in this backup", v)
+	}
 	if !r.req.FromSource {
 		p.prev = r.loadPrev()
 	}
@@ -138,7 +143,7 @@ func (r *run) locatePartial(p *plan) error {
 	}
 	p.resumed, p.partialDir = true, found.Path
 	r.finalDir = strings.TrimSuffix(found.Path, backupset.PartialSuffix)
-	r.log.Infof("resuming the partial backup %s (%d file(s) journaled)", found.Path, len(p.replay))
+	r.log.Infof("resuming the partial backup %s (%d file(s) journaled)", found.Path, len(p.replay.Entries))
 	return r.checkFinalFree()
 }
 
@@ -150,7 +155,9 @@ func (r *run) checkFinalFree() error {
 }
 
 // checkPartialOwner proves that dir is this job's own partial backup. A
-// directory it cannot prove ownership of is never touched.
+// directory it cannot prove ownership of is never touched. A partial that
+// holds nothing but an empty or headerless journal (a run killed right after
+// creating it) has no data to lose and counts as the job's own.
 func checkPartialOwner(dir, jobName string, p *plan) error {
 	fi, err := os.Lstat(dir)
 	if err != nil || !fi.IsDir() {
@@ -158,20 +165,44 @@ func checkPartialOwner(dir, jobName string, p *plan) error {
 	}
 	rep, err := journal.Read(filepath.Join(dir, journal.Name))
 	if errors.Is(err, os.ErrNotExist) {
-		m, merr := backupset.ReadMarker(dir)
-		if merr != nil || m.Job != jobName {
-			return exitcode.Refusedf("%s has no journal and no marker of job %q; refusing to reuse it (inspect it and move it away)", dir, jobName)
-		}
-		return nil
+		return ownedWithoutJournal(dir, jobName)
 	}
 	if err != nil {
 		return exitcode.Refusedf("%s: unusable journal: %v", dir, err)
 	}
+	if rep.Job == "" && holdsOnly(dir, journal.Name) {
+		p.replay = rep
+		return nil
+	}
 	if rep.Job != jobName {
 		return exitcode.Refusedf("%s belongs to job %q, not %q", dir, rep.Job, jobName)
 	}
-	p.replay = rep.Entries
+	p.replay = rep
 	return nil
+}
+
+func ownedWithoutJournal(dir, jobName string) error {
+	if m, err := backupset.ReadMarker(dir); err == nil && m.Job == jobName {
+		return nil
+	}
+	if holdsOnly(dir) {
+		return nil
+	}
+	return exitcode.Refusedf("%s has no journal and no marker of job %q; refusing to reuse it (inspect it and move it away)", dir, jobName)
+}
+
+// holdsOnly reports whether dir contains nothing but the named entries.
+func holdsOnly(dir string, names ...string) bool {
+	items, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, it := range items {
+		if !slices.Contains(names, it.Name()) {
+			return false
+		}
+	}
+	return true
 }
 
 // loadPrev reads the newest committed backup's manifest. Any problem is a
@@ -246,7 +277,7 @@ func (r *run) classify(p *plan) {
 		if e.Type != manifest.TypeFile {
 			continue
 		}
-		if ok && unchanged(e, pe) {
+		if ok && unchanged(e, pe) && !racy(e.MtimeNS, p.prev.marker.Started) {
 			p.files = append(p.files, fileJob{idx: i, prevSHA: pe.SHA256})
 			p.prevCount++
 			p.prevBytes += e.Size
@@ -259,6 +290,17 @@ func (r *run) classify(p *plan) {
 	if p.prev != nil {
 		p.removed = len(p.prev.entries) - seen
 	}
+}
+
+// racyMargin widens the window of "possibly rewritten within the same
+// timestamp tick" around a run's start; coarse filesystems tick every 1-2 s.
+const racyMargin = 2 * time.Second
+
+// racy reports whether a file with this mtime might have been rewritten after
+// a run that started at started copied it, without its size or mtime
+// changing. A zero start (an older marker or journal) never matches.
+func racy(mtimeNS int64, started time.Time) bool {
+	return !started.IsZero() && mtimeNS >= started.Add(-racyMargin).UnixNano()
 }
 
 func unchanged(cur, prev manifest.Entry) bool {

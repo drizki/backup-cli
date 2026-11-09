@@ -1,0 +1,10 @@
+# Managed by backup-cli. Remove with: backup-cli job rm docs
+[Unit]
+Description=backup-cli job docs
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/backup-cli --state-dir /var/lib/backup-cli run docs
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle

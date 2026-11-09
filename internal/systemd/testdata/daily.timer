@@ -1,0 +1,12 @@
+# Managed by backup-cli. Remove with: backup-cli job rm docs
+[Unit]
+Description=backup-cli schedule for job docs
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=0
+Unit=backup-cli-docs.service
+
+[Install]
+WantedBy=timers.target

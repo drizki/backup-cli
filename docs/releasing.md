@@ -11,9 +11,7 @@ without a tag report `dev`.
    `BREAKING CHANGE:` footer).
 2. [release-please](https://github.com/googleapis/release-please) keeps a
    release pull request open. It computes the next version from the commits and
-   updates `CHANGELOG.md`. The first release is forced to `1.0.0` by
-   `"release-as": "1.0.0"` in `release-please-config.json`; remove that line
-   after `v1.0.0` ships so later versions follow the commits.
+   updates `CHANGELOG.md`.
 3. Merging the release PR creates the tag and the GitHub Release.
 4. The release build runs for that tag (below) and uploads the assets.
 

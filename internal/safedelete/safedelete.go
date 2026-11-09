@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/drizki/backup-cli/internal/job"
 	"github.com/drizki/backup-cli/internal/mount"
@@ -85,27 +84,4 @@ func (g Guard) DeletePartial(j job.Job, dir string) error {
 		return err
 	}
 	return g.remove(t)
-}
-
-// remove re-checks the target through a handle on its parent and then
-// removes it relative to that handle, so a parent swapped after the check
-// cannot redirect the removal.
-func (g Guard) remove(t target) error {
-	if g.beforeRemove != nil {
-		g.beforeRemove(t.plan.Path)
-	}
-	root, err := os.OpenRoot(filepath.Dir(t.plan.Path))
-	if err != nil {
-		return refuse("cannot open the parent of %s: %v", t.plan.Path, err)
-	}
-	defer func() { _ = root.Close() }()
-	name := filepath.Base(t.plan.Path)
-	fi, err := root.Lstat(name)
-	if err != nil {
-		return refuse("%s changed before removal: %v", t.plan.Path, err)
-	}
-	if !fi.IsDir() || !os.SameFile(fi, t.fi) {
-		return refuse("%s changed type or identity between the check and the removal", t.plan.Path)
-	}
-	return root.RemoveAll(name)
 }

@@ -123,6 +123,27 @@ func TestSweepPartialRemovesWhatIsNotPlanned(t *testing.T) {
 	}
 }
 
+func TestSweepPartialOpensEveryPlannedDirectoryItVisits(t *testing.T) {
+	f := newFixture(t)
+	dir := f.partial("docs-20260301T000000Z.partial", "docs")
+	mkdir(t, filepath.Join(dir, "ro", "deep"))
+	write(t, filepath.Join(dir, "ro", "deep", "stray.txt"), "s")
+	readOnlyTree(t, dir) // leaves ro and ro/deep read-only
+	want := map[string]fs.FileMode{
+		"ro": fs.ModeDir, "ro/g.txt": 0, "ro/deep": fs.ModeDir, "ro/deep/f.txt": 0,
+	}
+	removed, err := SweepPartial(dir, want, "half.bin", journal.Name)
+	if err != nil || !slices.Equal(removed, []string{"ro/deep/stray.txt"}) {
+		t.Fatalf("removed %v, err %v", removed, err)
+	}
+	for _, p := range []string{"ro", "ro/deep"} {
+		fi, err := os.Lstat(filepath.Join(dir, p))
+		if err != nil || fi.Mode().Perm()&0o700 != 0o700 {
+			t.Errorf("%s: %v %v", p, fi, err)
+		}
+	}
+}
+
 func TestSweepPartialStaysInsideTheDirectory(t *testing.T) {
 	f := newFixture(t)
 	dir := f.partial("docs-20260301T000000Z.partial", "docs")

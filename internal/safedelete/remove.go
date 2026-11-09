@@ -56,12 +56,8 @@ func dropMarker(root *os.Root, name string) error {
 // and -searchable so RemoveAll can empty them. Symlinks are not followed and
 // failures are ignored: RemoveAll reports what it cannot remove.
 func openUp(root *os.Root, rel string) {
-	fi, err := root.Lstat(rel)
-	if err != nil || !fi.IsDir() {
+	if !openDir(root, rel) {
 		return
-	}
-	if fi.Mode().Perm()&0o700 != 0o700 {
-		_ = root.Chmod(rel, fi.Mode().Perm()|0o700)
 	}
 	d, err := root.Open(rel)
 	if err != nil {
@@ -74,6 +70,19 @@ func openUp(root *os.Root, rel string) {
 			openUp(root, path.Join(rel, it.Name()))
 		}
 	}
+}
+
+// openDir makes the single directory rel owner-readable, -writable and
+// -searchable and reports whether it is a directory. Symlinks are not followed.
+func openDir(root *os.Root, rel string) bool {
+	fi, err := root.Lstat(rel)
+	if err != nil || !fi.IsDir() {
+		return false
+	}
+	if fi.Mode().Perm()&0o700 != 0o700 {
+		_ = root.Chmod(rel, fi.Mode().Perm()|0o700)
+	}
+	return true
 }
 
 // SweepPartial removes from the partial backup directory dir every entry that
@@ -106,7 +115,7 @@ type sweeper struct {
 }
 
 func (s *sweeper) dir(rel string) error {
-	openUp(s.root, rel) // a crashed run may have left read-only directories
+	openDir(s.root, rel) // a crashed run may have left a read-only directory
 	d, err := s.root.Open(rel)
 	if err != nil {
 		return err

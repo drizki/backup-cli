@@ -29,9 +29,9 @@ func byPath(res Result) map[string]manifest.Entry {
 	return m
 }
 
-func TestWalkTree(t *testing.T) {
-	root := t.TempDir()
-	outside := t.TempDir()
+func buildTree(t *testing.T) (root, outside string, links map[string]string) {
+	t.Helper()
+	root, outside = t.TempDir(), t.TempDir()
 	mustWrite(t, filepath.Join(root, "a.txt"), "hello")
 	mustWrite(t, filepath.Join(root, "sub", "b.txt"), "bb")
 	mustWrite(t, filepath.Join(root, "name with space\nand newline"), "x")
@@ -40,14 +40,17 @@ func TestWalkTree(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	links := map[string]string{
-		"rel": "a.txt", "abs": "/etc/hostname", "dangling": "nowhere", "out": outside, "up": "../x",
-	}
+	links = map[string]string{"rel": "a.txt", "abs": "/etc/hostname", "dangling": "nowhere", "out": outside, "up": "../x"}
 	for n, target := range links {
 		if err := os.Symlink(target, filepath.Join(root, n)); err != nil {
 			t.Fatal(err)
 		}
 	}
+	return root, outside, links
+}
+
+func TestWalkTree(t *testing.T) {
+	root, _, links := buildTree(t)
 	res, err := Walk(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
@@ -68,6 +71,12 @@ func TestWalkTree(t *testing.T) {
 	if e := m["empty"]; e.Type != manifest.TypeDir {
 		t.Errorf("empty directory missing: %+v", e)
 	}
+	checkFiles(t, res, m)
+	checkParentsFirst(t, res)
+}
+
+func checkFiles(t *testing.T, res Result, m map[string]manifest.Entry) {
+	t.Helper()
 	for _, n := range []string{"a.txt", "sub/b.txt", "name with space\nand newline", "ünï/cödé"} {
 		if m[n].Type != manifest.TypeFile {
 			t.Errorf("%q missing", n)
@@ -79,20 +88,16 @@ func TestWalkTree(t *testing.T) {
 	if m["a.txt"].Size != 5 || m["a.txt"].MtimeNS == 0 || m["a.txt"].Mode != 0o644 {
 		t.Errorf("metadata %+v", m["a.txt"])
 	}
-	for i, e := range res.Entries {
-		if e.Path == "." {
-			continue
-		}
-		parent := filepath.ToSlash(filepath.Dir(e.Path))
-		found := false
-		for _, prior := range res.Entries[:i] {
-			if prior.Path == parent {
-				found = true
-			}
-		}
-		if !found {
+}
+
+func checkParentsFirst(t *testing.T, res Result) {
+	t.Helper()
+	seen := map[string]bool{}
+	for _, e := range res.Entries {
+		if parent := filepath.ToSlash(filepath.Dir(e.Path)); e.Path != "." && !seen[parent] {
 			t.Errorf("%s emitted before its parent %s", e.Path, parent)
 		}
+		seen[e.Path] = true
 	}
 }
 

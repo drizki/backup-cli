@@ -11,6 +11,7 @@ internal/copyx/copy_test.go:sha256sum binary missing
 internal/walk/walk_test.go:running as root
 internal/lock/lock_test.go:flock binary missing
 internal/engine/run_test.go:sha256sum binary missing
+internal/engine/openfail_test.go:running as root
 "
 
 status=0

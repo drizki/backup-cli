@@ -99,7 +99,10 @@ func (e *Engine) Run(ctx context.Context, req cli.EngineRequest) error {
 	}
 	r.id = state.NewRunID(r.start, r.j.Name)
 	if err := r.open(); err != nil {
-		return err
+		// Without a run directory the log goes to stderr, but the run still
+		// ends through finish so the status and the on-failure hook happen.
+		r.log = runlog.Mirror(r.req.Stderr)
+		return r.finish(ctx, err)
 	}
 	defer func() { _ = r.log.Close() }()
 	stopTicker := r.startProgress()

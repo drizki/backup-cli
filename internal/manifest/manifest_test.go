@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -62,6 +63,28 @@ func TestTSVRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(in, out) {
 		t.Fatalf("round trip differs:\n%v\n%v", in, out)
+	}
+}
+
+func TestEachTSVStreamsEntriesAndStopsOnError(t *testing.T) {
+	in := sampleEntries()
+	var buf bytes.Buffer
+	if err := WriteTSV(&buf, in); err != nil {
+		t.Fatal(err)
+	}
+	raw := buf.String()
+	var got []Entry
+	if err := EachTSV(strings.NewReader(raw), func(e Entry) error { got = append(got, e); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(in, got) {
+		t.Fatalf("streamed entries differ:\n%v\n%v", in, got)
+	}
+	stop := errors.New("stop")
+	n := 0
+	err := EachTSV(strings.NewReader(raw), func(Entry) error { n++; return stop })
+	if !errors.Is(err, stop) || n != 1 {
+		t.Fatalf("err %v after %d entries, want stop after 1", err, n)
 	}
 }
 

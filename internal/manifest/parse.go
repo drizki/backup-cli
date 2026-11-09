@@ -11,23 +11,40 @@ import (
 // ParseTSV reads a MANIFEST.tsv. Every path is validated so a poisoned
 // manifest cannot name anything outside the backup directory.
 func ParseTSV(r io.Reader) ([]Entry, error) {
+	var out []Entry
+	err := EachTSV(r, func(e Entry) error {
+		out = append(out, e)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// EachTSV parses a MANIFEST.tsv like ParseTSV but hands each entry to fn
+// instead of collecting them, so a caller can keep a compact form of a very
+// large manifest. It stops at the first error from fn. The strings of an
+// entry may share memory with the line they came from; clone what you keep.
+func EachTSV(r io.Reader, fn func(Entry) error) error {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	if !sc.Scan() {
-		return nil, fmt.Errorf("manifest is empty")
+		return fmt.Errorf("manifest is empty")
 	}
 	if sc.Text() != tsvHeader {
-		return nil, fmt.Errorf("manifest header is not recognised")
+		return fmt.Errorf("manifest header is not recognised")
 	}
-	var out []Entry
 	for n := 2; sc.Scan(); n++ {
 		e, err := parseRow(sc.Text())
 		if err != nil {
-			return nil, fmt.Errorf("manifest line %d: %w", n, err)
+			return fmt.Errorf("manifest line %d: %w", n, err)
 		}
-		out = append(out, e)
+		if err := fn(e); err != nil {
+			return err
+		}
 	}
-	return out, sc.Err()
+	return sc.Err()
 }
 
 func parseRow(line string) (Entry, error) {

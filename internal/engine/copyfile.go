@@ -48,7 +48,7 @@ func (c *copier) copyOne(ctx context.Context, buf []byte, f fileJob) error {
 
 // copyNew copies a file from the previous backup or, failing that, the source.
 func (c *copier) copyNew(ctx context.Context, buf []byte, f fileJob, dst string) error {
-	if f.prevSHA != "" && c.fromPrev(ctx, buf, f, dst) {
+	if f.fromPrev && c.fromPrev(ctx, buf, f, dst) {
 		c.r.fromPrev.Add(1)
 		return nil
 	}
@@ -122,7 +122,8 @@ func (c *copier) fromPrev(ctx context.Context, buf []byte, f fileJob, dst string
 		c.r.warn("copying the previous copy of %s failed (%v); reading the source", e.Path, err)
 		return false
 	}
-	if res.SHA256 != f.prevSHA || res.Size != e.Size {
+	want, _ := c.p.prev.lookup(e.Path)
+	if res.SHA256 != want.sumHex() || res.Size != e.Size {
 		c.r.warn("BITROT: the previous copy of %s no longer matches its checksum; recopying from the source", e.Path)
 		return false
 	}

@@ -112,8 +112,27 @@ window.
 ## Known limits
 
 - Memory grows with the number of files: the walk result, the previous
-  manifest and the resume journal are all held in memory, roughly 750 bytes per
-  file in total (about 7 GB at 10 million files).
+  manifest (kept compactly: size, mtime, checksum and the path) and the resume
+  journal are held in memory. Measured on a tree of 500,000 small files with
+  roughly 90-byte paths (ext4 on NVMe, a seeded run, peak resident memory):
+
+  | | before | after |
+  |---|---|---|
+  | default settings | 957 MB (about 1.9 KB per file) | 718 MB (about 1.45 KB per file) |
+  | `GOMAXPROCS=1 GOMEMLIMIT=450MiB` | 527 MB | 476 MB |
+
+  The live data alone is roughly 0.8 KB per file, so a limit cannot push the
+  total much below about 1 KB per file, and it costs CPU time (the limited run
+  took about 30% longer). Plan for about 1.5 KB per file: 1 million files need
+  about 1.5 GB, 5 million about 7 GB. For larger shares, split the source into
+  one job per top-level folder or give the container more memory.
+- When `GOMEMLIMIT` is not set and cgroup v2 reports a limit in
+  `/sys/fs/cgroup/memory.max`, the tool sets a soft memory limit of 80% of it, so
+  the garbage collector works harder before the kernel would kill the run. The
+  kernel's own limit is still the hard one, and `doctor` warns when the newest
+  backup's file count times the per-file figure above exceeds it. The file is
+  read at the cgroup of the namespace; under a plain systemd service on the
+  host, set `GOMEMLIMIT` yourself.
 - Retention runs only after a successful backup. If the destination fills up
   mid-run, the partial keeps its data and every later run is refused (exit 4,
   not enough space) until space is freed, for example with `rm` on an old backup.

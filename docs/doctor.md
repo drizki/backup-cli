@@ -18,6 +18,7 @@ the same result with a severity per check. Exit code 0 means no failures
 | destination mount | warn: the destination is on the root filesystem or not in the mount table | check that the backup disk is mounted |
 | backups | the number of committed backups | |
 | free space | fail: less than `keep + 1` backups of the newest backup's size fit (counting those already stored); ok when there is no backup yet | free space, lower `--keep`, or use a larger disk |
+| memory | warn: the newest backup's file count times the measured peak memory per file exceeds the cgroup v2 `memory.max`, so a run may be killed; not reported without a cgroup limit or a backup | split the source into several jobs or raise the limit; see Known limits in [how it works](how-it-works.md) |
 | leftover partial | warn: an interrupted run left a `.partial` directory | run the job again to resume it, or remove it with `rm`; doctor never deletes it |
 | unrecognized directories | warn: directories matching the job's template that are not committed backups (no marker, bad marker, another job's marker) | they are never pruned or touched; inspect or remove them by hand |
 | last run | fail: the last run failed; warn: partial, refused, never run (scheduled jobs), finished more than 40 days ago, or recorded as running although its process is gone | read its log with `backup-cli tail <run-id>` |
@@ -32,7 +33,9 @@ Checks that depend on a job are listed once per job.
 **Run refused (exit 4).** Read `refuse_reason` in `runs/<run-id>/status.json`.
 Typical reasons: lock held (another run is active), overlap between source and
 destination, not enough space, a leftover `.partial` from a different job, or a
-root file in the source named `MANIFEST.sha256`, `MANIFEST.tsv` or `.backup-cli.json`.
+root file in the source named `MANIFEST.sha256`, `MANIFEST.tsv` or `.backup-cli.json`,
+or a source with under half the files of the previous backup (the share may not
+be mounted).
 
 **Run partial (exit 3).** The deadline hit. Nothing was lost; run the job again
 and it resumes.

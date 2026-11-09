@@ -31,6 +31,7 @@ func checkJob(c *collector, env Env, j job.Job) {
 	committed := backupset.OnlyCommitted(backups)
 	c.add(OK, "backups", j.Name, "%d committed backup(s), keep %d", len(committed), j.Keep)
 	checkSpace(c, env, j, committed)
+	checkMemory(c, env, j, committed)
 	checkLeftovers(c, j, backups)
 	last := checkLastRun(c, env, j)
 	checkLock(c, env, j, last)

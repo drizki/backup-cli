@@ -1,10 +1,7 @@
 package engine
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -23,18 +20,11 @@ import (
 	"github.com/drizki/backup-cli/internal/walk"
 )
 
-// prevBackup is the newest committed backup, used to seed unchanged files.
-type prevBackup struct {
-	dir     string
-	marker  backupset.Marker
-	entries map[string]manifest.Entry
-}
-
-// fileJob is one regular file to copy. A non-empty prevSHA means "copy from
-// the previous backup and check against this checksum".
+// fileJob is one regular file to copy. A true fromPrev means "copy from the
+// previous backup and check against its recorded checksum".
 type fileJob struct {
-	idx     int
-	prevSHA string
+	idx      int
+	fromPrev bool
 }
 
 // plan is everything decided before the first byte is copied.
@@ -208,36 +198,6 @@ func holdsOnly(dir string, names ...string) bool {
 	return true
 }
 
-// loadPrev reads the newest committed backup's manifest. Any problem is a
-// warning: the run then reads everything from the source.
-func (r *run) loadPrev() *prevBackup {
-	committed := backupset.OnlyCommitted(r.backups)
-	if len(committed) == 0 {
-		return nil
-	}
-	b := committed[len(committed)-1]
-	raw, err := os.ReadFile(filepath.Join(b.Path, manifest.TSVName))
-	if err != nil {
-		r.warn("previous backup %s is unusable (%v); reading everything from the source", b.Name, err)
-		return nil
-	}
-	sum := sha256.Sum256(raw)
-	if hex.EncodeToString(sum[:]) != b.Marker.ManifestSHA256 {
-		r.warn("previous backup %s: manifest does not match its marker; reading everything from the source", b.Name)
-		return nil
-	}
-	entries, err := manifest.ParseTSV(bytes.NewReader(raw))
-	if err != nil {
-		r.warn("previous backup %s: %v; reading everything from the source", b.Name, err)
-		return nil
-	}
-	m := make(map[string]manifest.Entry, len(entries))
-	for _, e := range entries {
-		m[e.Path] = e
-	}
-	return &prevBackup{dir: b.Path, marker: *b.Marker, entries: m}
-}
-
 func (r *run) checkSpace(p *plan, srcBytes int64) error {
 	var last int64
 	if p.prev != nil {
@@ -259,15 +219,6 @@ func (r *run) checkSpace(p *plan, srcBytes int64) error {
 	return nil
 }
 
-// lookup returns the previous backup's entry for path; safe on nil.
-func (pb *prevBackup) lookup(path string) (manifest.Entry, bool) {
-	if pb == nil {
-		return manifest.Entry{}, false
-	}
-	e, ok := pb.entries[path]
-	return e, ok
-}
-
 // classify splits the files into those unchanged since the previous backup
 // and those that must be read from the source.
 func (r *run) classify(p *plan) {
@@ -281,7 +232,7 @@ func (r *run) classify(p *plan) {
 			continue
 		}
 		if ok && unchanged(e, pe) && !racy(e.MtimeNS, p.prev.marker.Started) {
-			p.files = append(p.files, fileJob{idx: i, prevSHA: pe.SHA256})
+			p.files = append(p.files, fileJob{idx: i, fromPrev: true})
 			p.prevCount++
 			p.prevBytes += e.Size
 			continue
@@ -306,6 +257,6 @@ func racy(mtimeNS int64, started time.Time) bool {
 	return !started.IsZero() && mtimeNS >= started.Add(-racyMargin).UnixNano()
 }
 
-func unchanged(cur, prev manifest.Entry) bool {
-	return prev.Type == manifest.TypeFile && prev.Size == cur.Size && prev.MtimeNS == cur.MtimeNS && prev.SHA256 != ""
+func unchanged(cur manifest.Entry, prev prevEntry) bool {
+	return prev.file && prev.size == cur.Size && prev.mtimeNS == cur.MtimeNS
 }

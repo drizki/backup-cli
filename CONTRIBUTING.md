@@ -11,7 +11,7 @@ tool that stays easy to read.
   commit, and the single guarded deletion path (see
   [docs/safety-model.md](docs/safety-model.md)).
 - Every feature ships with tests for success, failure and edge cases.
-- No TODO/FIXME/XXX/HACK comments, no placeholder code, no skipped tests (a
+- No leftover to-do style marker comments, no placeholder code, no skipped tests (a
   skip needs an environment reason and an entry in the check script's allowlist).
 
 ## Code quality rules

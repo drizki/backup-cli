@@ -70,6 +70,9 @@ func (r *run) prepare(ctx context.Context) (*plan, error) {
 	if err := rootCollision(res.Entries); err != nil {
 		return nil, err
 	}
+	if err := r.checkShrink(p, res.Files); err != nil {
+		return nil, err
+	}
 	p.entries, p.skipped = res.Entries, res.Skipped
 	describeSkipped(r, p)
 	for _, v := range res.Vanished {

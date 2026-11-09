@@ -52,7 +52,7 @@ backup-cli run <job> [flags]
 |---|---|
 | `--dry-run` | plan only: print counts and bytes to copy from source, copy from previous, and prune; writes nothing anywhere |
 | `--from-source` | ignore the previous backup and read everything from the source |
-| `--force` | bypass the biweekly gate |
+| `--force` | bypass the biweekly gate and the shrink check (a source with under half the files of the previous backup) |
 | `--jobs N` | override the job's worker count |
 | `--verify-sample PCT` | post-commit sample verification percent (default from the job, 2; 0 disables) |
 

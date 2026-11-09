@@ -16,7 +16,7 @@ func runCmd() *command {
 			req := EngineRequest{}
 			fs.BoolVar(&req.DryRun, "dry-run", false, "plan only; write nothing anywhere")
 			fs.BoolVar(&req.FromSource, "from-source", false, "ignore the previous backup and read everything from the source")
-			fs.BoolVar(&req.Force, "force", false, "bypass the biweekly gate")
+			fs.BoolVar(&req.Force, "force", false, "bypass the biweekly gate and the shrink check (a source with under half the previous file count)")
 			fs.IntVar(&req.Jobs, "jobs", 0, "parallel copy workers (default: the job's setting)")
 			fs.IntVar(&req.VerifySample, "verify-sample", -1, "percent of files re-verified after commit (default: the job's setting, 0 disables)")
 			return func(args []string) error { return a.runJob(args[0], req) }

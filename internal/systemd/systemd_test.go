@@ -51,6 +51,21 @@ func TestGoldenUnits(t *testing.T) {
 	}
 }
 
+// The service is ordered after mounts but must not require them: a failed
+// mount has to start the run so the empty-source guard can refuse and the
+// on-failure hook can alert.
+func TestServiceIsOrderedAfterMountsWithoutRequiringThem(t *testing.T) {
+	s := Unit{Job: "j", Binary: "/b", StateDir: "/s"}.ServiceText()
+	if !strings.Contains(s, "After=local-fs.target remote-fs.target\n") {
+		t.Fatalf("missing mount ordering:\n%s", s)
+	}
+	for _, bad := range []string{"RequiresMountsFor", "Requires="} {
+		if strings.Contains(s, bad) {
+			t.Fatalf("service must not contain %s:\n%s", bad, s)
+		}
+	}
+}
+
 func TestServiceHardening(t *testing.T) {
 	s := Unit{Job: "j", Binary: "/opt/my tools/backup-cli", StateDir: "/var/lib/a b/%x$y", OnCalendar: "daily"}.ServiceText()
 	want := `ExecStart="/opt/my tools/backup-cli" --state-dir "/var/lib/a b/%%x$$y" run j`

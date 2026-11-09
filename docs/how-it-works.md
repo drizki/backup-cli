@@ -27,6 +27,11 @@ as a local cache.
    2 second margin) counts as changed, because a write in the same timestamp
    tick as the copy would not change its size or mtime. A file or directory that
    disappears while the tree is listed is left out with a warning.
+   Right after the walk, before anything is swept, copied or pruned, the run
+   refuses (exit 4) if the source holds fewer than half the files of the newest
+   committed backup or of the partial being resumed, which includes an empty
+   source. The message suggests the source may not be mounted; `run --force`
+   overrides it.
 8. Copy with a small worker pool (default 4, `--jobs`):
    - unchanged: read from the previous backup, hash while writing, compare with
      the recorded hash. A mismatch is logged as bitrot and the file is

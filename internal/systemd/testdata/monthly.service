@@ -1,6 +1,7 @@
 # Managed by backup-cli. Remove with: backup-cli job rm docs
 [Unit]
 Description=backup-cli job docs
+After=local-fs.target remote-fs.target
 
 [Service]
 Type=oneshot

@@ -33,6 +33,7 @@ func (u Unit) ServiceText() string {
 	b.WriteString("# Managed by backup-cli. Remove with: backup-cli job rm " + u.Job + "\n")
 	b.WriteString("[Unit]\n")
 	b.WriteString("Description=backup-cli job " + u.Job + "\n")
+	b.WriteString("After=local-fs.target remote-fs.target\n")
 	b.WriteString("\n[Service]\n")
 	b.WriteString("Type=oneshot\n")
 	fmt.Fprintf(&b, "ExecStart=%s --state-dir %s run %s\n", quoteArg(u.Binary), quoteArg(u.StateDir), quoteArg(u.Job))

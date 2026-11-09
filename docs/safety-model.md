@@ -80,6 +80,18 @@ hand into an overlapping state. A per-job file lock refuses a second concurrent
 run (exit 4). `rm` takes the same lock, so it cannot delete a backup that a
 running job is writing or reading.
 
+## Unmounted or emptied source
+
+An unmounted share is an empty, readable directory. After walking the source
+and before any sweep, copy, commit or retention, a run refuses (exit 4) when
+the source holds fewer than half the files of the newest committed backup or of
+the partial being resumed, so an empty source never replaces good backups. The
+refusal fires the on-failure hook. `run --force` overrides the check. The
+generated systemd service is ordered after `local-fs.target` and
+`remote-fs.target`, so mounts are attempted first. A smaller drop (a
+mass deletion or in-place encryption that keeps the file count) is not
+detected; use a larger `keep` or filesystem snapshots of the backup dataset.
+
 ## Space
 
 Before copying, the free-space check refuses with the required and available

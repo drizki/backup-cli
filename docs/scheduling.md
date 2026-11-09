@@ -61,6 +61,13 @@ with `scheduled: false`) and drive it from cron yourself.
 Units are written to `/etc/systemd/system`. Override with the global `--unit-dir`
 flag (before the command) or `BACKUP_CLI_UNIT_DIR`.
 
+The service unit has `After=local-fs.target remote-fs.target`, so the system
+tries to mount the source first. It deliberately does not use `Requires=` or
+`RequiresMountsFor=`: with those, a failed mount makes systemd skip the service
+as a dependency failure, so backup-cli never runs and the on-failure hook never
+fires. With ordering only, the run still starts, the empty-source check refuses
+it (exit 4) and the hook alerts.
+
 ## Deadline
 
 `--deadline` is stored with the job and resolved at each run start: an absolute

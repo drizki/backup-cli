@@ -107,6 +107,10 @@ destination parent, overlap with the source or the state directory, a mount
 point, or a job that no longer exists (after `job rm` the guards cannot be
 checked, so remove such backups by hand).
 
+`rm` takes the job's run lock before it deletes, so it never removes the
+partial backup of a running run or the backup that run is seeding from. While a
+run holds the lock `rm` exits 4 and deletes nothing; `--dry-run` needs no lock.
+
 ## job rm
 
 ```

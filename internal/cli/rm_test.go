@@ -11,6 +11,7 @@ import (
 	"github.com/drizki/backup-cli/internal/backupset"
 	"github.com/drizki/backup-cli/internal/exitcode"
 	"github.com/drizki/backup-cli/internal/journal"
+	"github.com/drizki/backup-cli/internal/lock"
 )
 
 // rmEnv has job "one" and two committed backups.
@@ -228,5 +229,25 @@ func TestIsTerminal(t *testing.T) {
 	a := &app{d: e.deps}
 	if a.isTTY() {
 		t.Fatal("no IsTTY func means not a terminal")
+	}
+}
+
+func TestRmRefusesWhileTheJobIsRunning(t *testing.T) {
+	e := newRmEnv(t)
+	l, err := lock.Acquire(e.store().LockPath("one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.expectCode(exitcode.Refused, "rm", "--yes", e.older)
+	if !exists(e.older) {
+		t.Fatal("deleted while the job lock was held")
+	}
+	e.mustRun("rm", "--dry-run", e.older) // a preview does not need the lock
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	e.mustRun("rm", "--yes", e.older)
+	if exists(e.older) {
+		t.Fatal("not deleted after the lock was released")
 	}
 }

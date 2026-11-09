@@ -66,7 +66,8 @@ good backup is never pruned. `rm` refuses to delete the last good backup unless
 `add` and `run` refuse a source and destination that overlap in either
 direction, resolved through symlinks, and also when a job file was edited by
 hand into an overlapping state. A per-job file lock refuses a second concurrent
-run (exit 4).
+run (exit 4). `rm` takes the same lock, so it cannot delete a backup that a
+running job is writing or reading.
 
 ## Space
 

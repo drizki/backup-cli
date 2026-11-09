@@ -11,6 +11,7 @@ import (
 	"github.com/drizki/backup-cli/internal/exitcode"
 	"github.com/drizki/backup-cli/internal/job"
 	"github.com/drizki/backup-cli/internal/journal"
+	"github.com/drizki/backup-cli/internal/lock"
 	"github.com/drizki/backup-cli/internal/safedelete"
 	"github.com/drizki/backup-cli/internal/space"
 	"github.com/drizki/backup-cli/internal/state"
@@ -78,7 +79,29 @@ func (a *app) rm(arg string, o rmOptions) error {
 		_, _ = fmt.Fprintln(a.out(), "aborted: nothing was deleted")
 		return nil
 	}
+	unlock, err := lockJob(store, j.Name)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return a.remove(g, j, plan)
+}
+
+// lockJob takes the job's run lock so rm cannot delete the partial backup of
+// a running run or the backup it is seeding from. It refuses while a run
+// holds the lock.
+func lockJob(store state.Store, name string) (func(), error) {
+	if err := store.Ensure(); err != nil {
+		return nil, exitcode.With(exitcode.Failed, err)
+	}
+	l, err := lock.Acquire(store.LockPath(name))
+	if errors.Is(err, lock.ErrHeld) {
+		return nil, refusedf("a run of job %q is in progress; try again when it has finished", name)
+	}
+	if err != nil {
+		return nil, exitcode.With(exitcode.Failed, err)
+	}
+	return func() { _ = l.Close() }, nil
 }
 
 // ownerJob finds the job that owns dir: the marker's job for a committed

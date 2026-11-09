@@ -28,7 +28,7 @@ func (r *run) afterCommit(ctx context.Context) error {
 		r.warn("retention skipped: %v", err)
 		return nil
 	}
-	if err := r.e.Retention(ctx, r.j, backupset.OnlyCommitted(all), r.log); err != nil {
+	if err := r.e.Retention(ctx, r.j, backupset.OnlyCommitted(all), r.finalDir, r.log); err != nil {
 		r.warn("retention failed: %v", err)
 	}
 	return nil

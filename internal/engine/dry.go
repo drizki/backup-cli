@@ -2,9 +2,12 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/drizki/backup-cli/internal/backupset"
+	"github.com/drizki/backup-cli/internal/retention"
 	"github.com/drizki/backup-cli/internal/space"
 )
 
@@ -39,13 +42,14 @@ func (r *run) report(p *plan) {
 		len(names), r.j.Keep, strings.Join(names, ", "))
 }
 
-// pruneNames lists the oldest backups that fall outside keep once the new
-// backup exists.
+// pruneNames lists the backups retention would remove once the new backup
+// exists, using retention's own planner with the new backup as a stand-in.
 func pruneNames(committed []backupset.Backup, keep int) []string {
-	excess := len(committed) + 1 - keep
+	newest := backupset.Backup{Name: "(new backup)", Status: backupset.Committed,
+		Marker: &backupset.Marker{Created: time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)}}
 	var names []string
-	for i := 0; i < excess && i < len(committed); i++ {
-		names = append(names, committed[i].Name)
+	for _, b := range retention.Plan(append(slices.Clone(committed), newest), keep) {
+		names = append(names, b.Name)
 	}
 	return names
 }

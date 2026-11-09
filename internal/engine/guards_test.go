@@ -249,7 +249,7 @@ func TestBiweeklyGate(t *testing.T) {
 func TestVerifySampleFailureFailsTheRunAndSkipsRetention(t *testing.T) {
 	f := newFixture(t)
 	retained := 0
-	f.e.Retention = func(context.Context, job.Job, []backupset.Backup, *runlog.Log) error { retained++; return nil }
+	f.e.Retention = func(context.Context, job.Job, []backupset.Backup, string, *runlog.Log) error { retained++; return nil }
 	f.e.PostCommit = func(dir string) { flipByte(t, filepath.Join(dir, "sub", "b.bin")) }
 	err := f.run(func(r *cli.EngineRequest) { r.VerifySample = 100 })
 	f.expectCode(exitcode.Failed, err)
@@ -282,7 +282,7 @@ func TestVerifySampleDisabledAndJobDefault(t *testing.T) {
 func TestRetentionSeam(t *testing.T) {
 	f := newFixture(t)
 	var seen [][]string
-	f.e.Retention = func(_ context.Context, j job.Job, c []backupset.Backup, _ *runlog.Log) error {
+	f.e.Retention = func(_ context.Context, j job.Job, c []backupset.Backup, _ string, _ *runlog.Log) error {
 		var names []string
 		for _, b := range c {
 			names = append(names, b.Name)

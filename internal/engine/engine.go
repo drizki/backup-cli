@@ -18,6 +18,7 @@ import (
 	"github.com/drizki/backup-cli/internal/cli"
 	"github.com/drizki/backup-cli/internal/exitcode"
 	"github.com/drizki/backup-cli/internal/job"
+	"github.com/drizki/backup-cli/internal/retention"
 	"github.com/drizki/backup-cli/internal/runlog"
 	"github.com/drizki/backup-cli/internal/space"
 	"github.com/drizki/backup-cli/internal/state"
@@ -39,9 +40,10 @@ type Engine struct {
 	Statfs space.StatFunc
 	// Now returns the current time; nil means time.Now.
 	Now func() time.Time
-	// Retention prunes old backups after a fully successful run. The engine
-	// itself never deletes; nil means no pruning.
-	Retention func(ctx context.Context, j job.Job, committed []backupset.Backup, log *runlog.Log) error
+	// Retention prunes old backups after a fully successful run; current is
+	// the backup just made. The engine itself never deletes; nil means no
+	// pruning.
+	Retention func(ctx context.Context, j job.Job, committed []backupset.Backup, current string, log *runlog.Log) error
 	// HookTimeout bounds a hook; zero means five minutes.
 	HookTimeout time.Duration
 	// Rand selects the verification sample; nil seeds from the clock.
@@ -52,7 +54,7 @@ type Engine struct {
 
 // Run is the production entry point registered with the CLI.
 func Run(ctx context.Context, req cli.EngineRequest) error {
-	return (&Engine{}).Run(ctx, req)
+	return (&Engine{Retention: retention.Func(req.Store.Dir)}).Run(ctx, req)
 }
 
 func (e *Engine) now() time.Time {

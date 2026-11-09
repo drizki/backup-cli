@@ -1,0 +1,56 @@
+name: Release
+
+# Builds and publishes release assets for a SemVer tag vMAJOR.MINOR.PATCH.
+# Runs when a tag is pushed (manual tags, or tags made with a PAT) and when
+# release-please.yml calls it after creating a release.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag, for example v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Verify tag is strict SemVer and on main
+        run: |
+          echo "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' ||
+            { echo "::error::$TAG is not vMAJOR.MINOR.PATCH"; exit 1; }
+          git fetch origin main
+          git merge-base --is-ancestor HEAD origin/main ||
+            { echo "::error::$TAG is not on main"; exit 1; }
+      - name: Build and package
+        run: scripts/release-build.sh "$TAG" dist
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+      - name: Upload to GitHub Release
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 ||
+            gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber

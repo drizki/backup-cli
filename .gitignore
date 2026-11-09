@@ -1,0 +1,6 @@
+/backup-cli
+/dist/
+*.test
+*.out
+coverage.*
+cover.html

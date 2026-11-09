@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.1](https://github.com/drizki/backup-cli/compare/v1.0.0...v1.0.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **cli:** accept only durations for add --deadline ([46385c8](https://github.com/drizki/backup-cli/commit/46385c84033ca28c018b3830aa634ca7bcffc57e)), closes [#21](https://github.com/drizki/backup-cli/issues/21)
+* **cli:** recheck the last-good rule in rm after taking the job lock ([81d49f4](https://github.com/drizki/backup-cli/commit/81d49f4c64551a2c32205284fffa86507d8b3f2a)), closes [#20](https://github.com/drizki/backup-cli/issues/20)
+* **cli:** refuse a destination template already used by another job ([5c2ffa3](https://github.com/drizki/backup-cli/commit/5c2ffa380b9b9e2dbdb84df4271acc9adb1ac268)), closes [#22](https://github.com/drizki/backup-cli/issues/22)
+* **engine:** keep the previous manifest compact and set a soft memory limit ([dc7f5a9](https://github.com/drizki/backup-cli/commit/dc7f5a97757c20018a70ea3074d50bcb029baad8)), closes [#18](https://github.com/drizki/backup-cli/issues/18)
+* **engine:** refuse a source that shrank below half the previous file count ([dc5433f](https://github.com/drizki/backup-cli/commit/dc5433f977e0de6e7b157bef93d5512dcda20296)), closes [#17](https://github.com/drizki/backup-cli/issues/17)
+* **engine:** run the on-failure hook when the run directory cannot be created ([0307891](https://github.com/drizki/backup-cli/commit/03078914ce326aaa31b83fb44967ccaad2304aac)), closes [#19](https://github.com/drizki/backup-cli/issues/19)
+* **safedelete:** make only the visited directory writable during a sweep ([7559442](https://github.com/drizki/backup-cli/commit/75594422ce95bc8ff3a318318e8067b95e47365e)), closes [#23](https://github.com/drizki/backup-cli/issues/23)
+
 ## 1.0.0 (2026-11-09)
 
 

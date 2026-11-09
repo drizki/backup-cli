@@ -88,6 +88,13 @@ func (a *app) confirmAndRemove(store state.Store, g safedelete.Guard, j job.Job,
 		return err
 	}
 	defer unlock()
+	// Another rm may have removed the sibling while this one waited at the
+	// prompt, so the last-good rule is checked again under the lock.
+	if !plan.Partial && !o.force {
+		if err := lastGoodCheck(j, plan.Path); err != nil {
+			return err
+		}
+	}
 	return a.remove(g, j, plan)
 }
 

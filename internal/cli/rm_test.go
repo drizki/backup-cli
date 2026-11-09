@@ -139,6 +139,35 @@ func TestRmLastBackupNeedsForce(t *testing.T) {
 	}
 }
 
+// onRead runs f the first time the reader is read, then reports "y".
+type onRead struct {
+	f    func()
+	done bool
+}
+
+func (r *onRead) Read(p []byte) (int, error) {
+	if !r.done {
+		r.done = true
+		r.f()
+		return copy(p, "y\n"), nil
+	}
+	return 0, io.EOF
+}
+
+func TestRmRechecksTheLastGoodRuleAfterTheConfirmation(t *testing.T) {
+	e := newRmEnv(t)
+	e.deps.IsTTY = func(io.Reader) bool { return true }
+	e.deps.Stdin = &onRead{f: func() {
+		if err := os.RemoveAll(e.newer); err != nil { // a second rm finished meanwhile
+			t.Fatal(err)
+		}
+	}}
+	e.expectCode(exitcode.Refused, "rm", e.older)
+	if !exists(e.older) || !strings.Contains(e.errb.String(), "last good backup") {
+		t.Fatalf("the last backup was deleted or the refusal is unclear: %s", e.errb.String())
+	}
+}
+
 func TestRmForceStillObeysEveryGuard(t *testing.T) {
 	e := newRmEnv(t)
 	e.mustRun("rm", "--yes", e.older) // newer is now the last backup

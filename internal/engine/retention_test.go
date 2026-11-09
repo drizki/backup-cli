@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -163,5 +164,29 @@ func TestRetentionKeepsTheNewBackupWithAnUncleanTemplateAndBackwardClock(t *test
 	f.mustRun()
 	if _, err := os.Lstat(f.j.DstFor(baseTime.Add(time.Hour))); err != nil {
 		t.Fatalf("the backup just made was removed by retention: %v\n%s", err, f.out.String())
+	}
+}
+
+func TestSignalDuringSampleVerifyKeepsTheCommittedBackupAndSkipsRetention(t *testing.T) {
+	f := newFixture(t)
+	f.j.Keep = 1
+	f.save()
+	f.e.Retention = retention.Func(f.store.Dir)
+	f.mustRun()
+	first := f.latest()
+	ctx, cancel := context.WithCancel(context.Background())
+	f.e.PostCommit = func(string) { cancel() } // SIGTERM arrives right after the commit
+	if err := f.runCtx(ctx, func(r *cli.EngineRequest) { r.VerifySample = 100 }); err != nil {
+		t.Fatalf("exit %d: %v\n%s", exitcode.Code(err), err, f.out.String())
+	}
+	st := f.lastStatus()
+	if st.State != "succeeded" || !hasWarning(st, "verification was interrupted") {
+		t.Fatalf("%+v", st)
+	}
+	if len(f.committed()) != 2 {
+		t.Fatalf("%d committed backups, want the old one and the new one", len(f.committed()))
+	}
+	if _, err := os.Lstat(first); err != nil {
+		t.Fatalf("retention ran after an interrupted verification: %v", err)
 	}
 }

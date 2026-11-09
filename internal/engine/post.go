@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"strconv"
 
 	"github.com/drizki/backup-cli/internal/backupset"
@@ -11,13 +12,20 @@ import (
 	"github.com/drizki/backup-cli/internal/state"
 )
 
+// errVerifyInterrupted means a signal stopped the sample verification of a
+// backup that was already committed.
+var errVerifyInterrupted = errors.New("verification interrupted")
+
 // afterCommit verifies a sample of the new backup and then runs retention.
 // A failed verification fails the run and skips retention.
 func (r *run) afterCommit(ctx context.Context) error {
 	if r.e.PostCommit != nil {
 		r.e.PostCommit(r.finalDir)
 	}
-	if err := r.verifySample(ctx); err != nil {
+	if err := r.verifySample(ctx); errors.Is(err, errVerifyInterrupted) {
+		r.warn("post-commit verification was interrupted; the backup is committed but not verified, and retention is skipped")
+		return nil
+	} else if err != nil {
 		return err
 	}
 	if r.e.Retention == nil {
@@ -48,6 +56,9 @@ func (r *run) verifySample(ctx context.Context) error {
 		return nil
 	}
 	rep, err := manifest.Verify(ctx, r.finalDir, manifest.VerifyOptions{SamplePct: float64(pct), Rand: r.e.Rand})
+	if err != nil && ctx.Err() != nil && rep.OK() {
+		return errVerifyInterrupted
+	}
 	if err != nil {
 		return exitcode.Failedf("verify %s: %v", r.finalDir, err)
 	}

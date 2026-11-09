@@ -173,6 +173,20 @@ func TestAddDuplicateName(t *testing.T) {
 	}
 }
 
+func TestAddRefusesADestinationUsedByAnotherJob(t *testing.T) {
+	e := newEnv(t)
+	e.mustRun("add", e.src, e.tmpl("one"), "--no-schedule", "--name", "one")
+	same := filepath.Join(e.dstP, "x", "..", "one-{timestamp}")
+	e.expectCode(exitcode.Refused, "add", e.src, same, "--no-schedule", "--name", "two")
+	if !strings.Contains(e.errb.String(), `used by job "one"`) {
+		t.Fatalf("unclear message: %s", e.errb.String())
+	}
+	if _, err := e.store().LoadJob("two"); err == nil {
+		t.Fatal("the second job was stored")
+	}
+	e.mustRun("add", e.src, e.tmpl("other"), "--no-schedule", "--name", "three")
+}
+
 func TestAddDeadlineAcceptsDurationsOnly(t *testing.T) {
 	e := newEnv(t)
 	e.mustRun("add", e.src, e.tmpl("a"), "--no-schedule", "--name", "a", "--deadline", "2h30m")

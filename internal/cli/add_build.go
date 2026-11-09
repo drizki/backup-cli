@@ -51,7 +51,22 @@ func (a *app) buildJob(store state.Store, src, dst string, o addOpts) (job.Job, 
 	if err := j.Validate(); err != nil {
 		return job.Job{}, sched, exitcode.With(exitcode.Usage, err)
 	}
+	if err := checkTemplateFree(store, j); err != nil {
+		return job.Job{}, sched, err
+	}
 	return j, sched, nil
+}
+
+// checkTemplateFree refuses a destination template another job already uses:
+// two jobs sharing one would resume and prune each other's backups.
+func checkTemplateFree(store state.Store, j job.Job) error {
+	others, _ := store.ListJobs()
+	for _, o := range others {
+		if filepath.Clean(o.DstTemplate) == filepath.Clean(j.DstTemplate) {
+			return exitcode.Refusedf("destination %s is already used by job %q; give each job its own destination", j.DstTemplate, o.Name)
+		}
+	}
+	return nil
 }
 
 func checkSource(src string) (string, error) {

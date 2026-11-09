@@ -42,6 +42,10 @@ absolute path that must contain `{timestamp}`, which becomes the UTC start time
 Without systemd, `add` prints the equivalent cron line and exits 4 (unless
 `--no-schedule`). See [scheduling](scheduling.md).
 
+`add` also exits 4 when the destination template, once cleaned, equals the one
+of an existing job, because two jobs sharing it would resume and prune each
+other's backups.
+
 ## run
 
 ```

@@ -139,35 +139,48 @@ func TestPlanIgnoresNonCommitted(t *testing.T) {
 
 func TestPruneRemovesOldestAndLeavesTheRest(t *testing.T) {
 	for _, keep := range []int{1, 2, 5} {
-		t.Run(fmt.Sprint("keep", keep), func(t *testing.T) {
-			f := newFixture(t, keep)
-			var dirs []string
-			for n := 1; n <= 6; n++ {
-				dirs = append(dirs, f.backup(n))
-			}
-			unknown := filepath.Join(f.dst, "docs-20260307T000000Z") // marker-less: never touched
-			partial := filepath.Join(f.dst, "docs-20260308T000000Z.partial")
-			foreign := filepath.Join(f.dst, "keepme")
-			for _, d := range []string{unknown, partial, foreign} {
-				if err := os.MkdirAll(d, 0o755); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := Prune(context.Background(), f.g, f.j, f.scan(), dirs[5], f.log); err != nil {
-				t.Fatal(err)
-			}
-			for i, d := range dirs {
-				if want := i >= 6-keep; exists(d) != want {
-					t.Errorf("backup %d: exists=%v want %v", i+1, exists(d), want)
-				}
-			}
-			for _, d := range []string{unknown, partial, foreign} {
-				if !exists(d) {
-					t.Errorf("%s was touched", d)
-				}
-			}
-		})
+		t.Run(fmt.Sprint("keep", keep), func(t *testing.T) { pruneSix(t, keep) })
 	}
+}
+
+// pruneSix prunes six backups down to keep and checks who survived.
+func pruneSix(t *testing.T, keep int) {
+	f := newFixture(t, keep)
+	var dirs []string
+	for n := 1; n <= 6; n++ {
+		dirs = append(dirs, f.backup(n))
+	}
+	bystanders := f.bystanders()
+	if err := Prune(context.Background(), f.g, f.j, f.scan(), dirs[5], f.log); err != nil {
+		t.Fatal(err)
+	}
+	for i, d := range dirs {
+		if want := i >= 6-keep; exists(d) != want {
+			t.Errorf("backup %d: exists=%v want %v", i+1, exists(d), want)
+		}
+	}
+	for _, d := range bystanders {
+		if !exists(d) {
+			t.Errorf("%s was touched", d)
+		}
+	}
+}
+
+// bystanders creates directories retention must never touch: one matching
+// the template without a marker, a .partial, and an unrelated one.
+func (f *fixture) bystanders() []string {
+	f.t.Helper()
+	dirs := []string{
+		filepath.Join(f.dst, "docs-20260307T000000Z"),
+		filepath.Join(f.dst, "docs-20260308T000000Z.partial"),
+		filepath.Join(f.dst, "keepme"),
+	}
+	for _, d := range dirs {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+	return dirs
 }
 
 func TestPruneNeverRemovesTheLastBackup(t *testing.T) {

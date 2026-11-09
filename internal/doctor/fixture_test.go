@@ -85,7 +85,7 @@ func (f *fixture) mounts(content string) {
 	write(f.t, f.info, content)
 }
 
-func (f *fixture) backup(n int, bytes int64) string {
+func (f *fixture) backup(n int, bytes int64) {
 	f.t.Helper()
 	dir := filepath.Join(f.dst, fmt.Sprintf("docs-202603%02dT000000Z", n))
 	mkdir(f.t, dir)
@@ -93,7 +93,6 @@ func (f *fixture) backup(n int, bytes int64) string {
 	if err := backupset.WriteMarker(dir, m); err != nil {
 		f.t.Fatal(err)
 	}
-	return dir
 }
 
 func (f *fixture) status(id, st string, finished time.Time, mod func(*state.Status)) {

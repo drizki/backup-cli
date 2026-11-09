@@ -173,14 +173,20 @@ func TestAddDuplicateName(t *testing.T) {
 	}
 }
 
-func TestAddDeadlineForms(t *testing.T) {
+func TestAddDeadlineAcceptsDurationsOnly(t *testing.T) {
 	e := newEnv(t)
-	for i, d := range []string{"2h30m", "2030-01-02T03:04:05Z", "2030-01-02 03:04"} {
-		name := string(rune('a' + i))
-		e.mustRun("add", e.src, e.tmpl(name), "--no-schedule", "--name", name, "--deadline", d)
-		if j, _ := e.store().LoadJob(name); j.Deadline != d {
-			t.Fatalf("deadline stored as %q want %q", j.Deadline, d)
+	e.mustRun("add", e.src, e.tmpl("a"), "--no-schedule", "--name", "a", "--deadline", "2h30m")
+	if j, _ := e.store().LoadJob("a"); j.Deadline != "2h30m" {
+		t.Fatalf("deadline stored as %q", j.Deadline)
+	}
+	for _, d := range []string{"2030-01-02T03:04:05Z", "2026-11-01 06:00", "0s", "-1h"} {
+		e.expectCode(exitcode.Usage, "add", e.src, e.tmpl("b"), "--no-schedule", "--name", "b", "--deadline", d)
+		if !strings.Contains(e.errb.String(), "positive duration") {
+			t.Errorf("%q: unclear message: %s", d, e.errb.String())
 		}
+	}
+	if _, err := e.store().LoadJob("b"); err == nil {
+		t.Fatal("a job with a rejected deadline was stored")
 	}
 }
 

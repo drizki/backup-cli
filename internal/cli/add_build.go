@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/drizki/backup-cli/internal/exitcode"
@@ -84,8 +85,9 @@ func checkAddFlags(dst string, o addOpts) error {
 	if o.deadline == "" {
 		return nil
 	}
-	if _, err := job.ParseDeadline(o.deadline, time.Now()); err != nil {
-		return exitcode.With(exitcode.Usage, err)
+	if d, err := time.ParseDuration(strings.TrimSpace(o.deadline)); err != nil || d <= 0 {
+		return exitcode.Usagef("--deadline %q must be a positive duration like 2h30m; "+
+			"an absolute time is not stored with a job because once it has passed every scheduled run would stop at once", o.deadline)
 	}
 	return nil
 }

@@ -95,7 +95,7 @@ removed that way.
 
 ## Deadlines
 
-`--deadline` (absolute time, or a duration like `2h30m` from run start) makes
+`--deadline` (a duration like `2h30m` from run start) makes
 the run stop cleanly between files or buffer chunks. The `.partial` directory is
 kept, the journal gets a `clean-stop` record, the state is `partial`, and the
 exit code is 3. The next run resumes it and does not re-hash the files of that

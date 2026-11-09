@@ -31,7 +31,7 @@ absolute path that must contain `{timestamp}`, which becomes the UTC start time
 | `--name NAME` | job name, `[a-z0-9._-]{1,64}`; default is a slug of the source basename, made unique |
 | `--schedule SPEC` | `daily,HH:MM`, `weekly,<day>,HH:MM`, `biweekly,<day>,HH:MM`, `monthly,<1-28>,HH:MM`, `oncalendar:<expr>` |
 | `--keep N` | number of backups to keep, at least 1 |
-| `--deadline VALUE` | stop cleanly at an absolute time (RFC3339 or `YYYY-MM-DD HH:MM`) or after a duration (`2h30m`) |
+| `--deadline DURATION` | stop each run after this duration (`2h30m`); absolute times are rejected because a past time would stop every later run at once |
 | `--on-success CMD` | shell command run after a successful run |
 | `--on-failure CMD` | shell command run after a failed or partial run |
 | `--jobs N` | copy workers (default 4) |

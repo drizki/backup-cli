@@ -57,7 +57,7 @@ func addCmd() *command {
 			fs.IntVar(&o.keep, "keep", job.DefaultKeep, "number of committed backups to keep (>= 1)")
 			fs.BoolVar(&o.now, "now", false, "start the first run immediately")
 			fs.BoolVar(&o.noSchedule, "no-schedule", false, "store the job without installing a systemd timer")
-			fs.StringVar(&o.deadline, "deadline", "", "stop runs at this time: RFC3339, \"YYYY-MM-DD HH:MM\" or a duration like 2h30m")
+			fs.StringVar(&o.deadline, "deadline", "", "stop each run after this duration, like 2h30m")
 			fs.StringVar(&o.onSuccess, "on-success", "", "shell command to run after a successful run")
 			fs.StringVar(&o.onFailure, "on-failure", "", "shell command to run after a failed or partial run")
 			fs.IntVar(&o.jobs, "jobs", job.DefaultJobs, "parallel copy workers")

@@ -70,8 +70,9 @@ it (exit 4) and the hook alerts.
 
 ## Deadline
 
-`--deadline` is stored with the job and resolved at each run start: an absolute
-time (RFC3339 or `YYYY-MM-DD HH:MM`) or a duration (`2h30m`) relative to run start.
+`--deadline` takes a duration (`2h30m`), is stored with the job and counted from
+each run's start. An absolute time is rejected by `add`: once it passed, every
+scheduled run would stop at once.
 When the deadline passes, the run stops cleanly with exit 3 and resumes next time.
 
 ## Removing

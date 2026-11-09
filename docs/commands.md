@@ -9,7 +9,10 @@ backup-cli [global flags] <command> [flags] [args]
 | Flag | Env | Default | Meaning |
 |---|---|---|---|
 | `--state-dir DIR` | `BACKUP_CLI_STATE_DIR` | `/var/lib/backup-cli` | where jobs, runs and locks live |
-| `--verbose` | | off | more output |
+| `--unit-dir DIR` | `BACKUP_CLI_UNIT_DIR` | `/etc/systemd/system` | where `add` and `job rm` write and remove systemd units |
+| `--verbose`, `-v` | | off | verbose diagnostics on stderr |
+
+Global flags go before the command: `backup-cli --state-dir DIR run <job>`.
 
 ## add
 
@@ -34,7 +37,7 @@ absolute path that must contain `{timestamp}`, which becomes the UTC start time
 | `--jobs N` | copy workers (default 4) |
 | `--now` | start one run immediately; detached under systemd, foreground otherwise |
 | `--no-schedule` | save the job without installing a timer |
-| `--unit-dir DIR` | systemd unit directory (env `BACKUP_CLI_UNIT_DIR`, default `/etc/systemd/system`) |
+| `--verify-sample PCT` | percent of files re-verified after each commit (default 2; 0 disables) |
 
 Without systemd, `add` prints the equivalent cron line and exits 4 (unless
 `--no-schedule`). See [scheduling](scheduling.md).
@@ -56,10 +59,11 @@ backup-cli run <job> [flags]
 ## list
 
 ```
-backup-cli list jobs|runs|backups [--json]
+backup-cli list jobs|runs|backups [--job NAME] [--json]
 ```
 
-Tables for humans, or JSON with `--json`. `list backups` shows committed backups
+Tables for humans, or JSON with `--json`. `--job NAME` limits `list runs` and
+`list backups` to one job. `list backups` shows committed backups
 (valid marker) for every job, with the ids accepted by `rm` and `verify`.
 
 ## tail
@@ -78,7 +82,8 @@ backup-cli verify <backup> [--sample PCT]
 ```
 
 Re-hashes files against the backup's manifest. `<backup>` is a path or a
-`<job>/<name>` id. `--sample PCT` (0-100) checks a random percentage; default is all files.
+`<job>/<name>` id. `--sample PCT` (above 0, at most 100) checks a random percentage; default is
+all files.
 Reports mismatches, missing files, and extra files (extra files are a warning).
 
 ## rm

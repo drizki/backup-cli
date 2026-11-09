@@ -58,8 +58,8 @@ with `scheduled: false`) and drive it from cron yourself.
 
 ## Unit directory
 
-Units are written to `/etc/systemd/system`. Override with `--unit-dir` or
-`BACKUP_CLI_UNIT_DIR`.
+Units are written to `/etc/systemd/system`. Override with the global `--unit-dir`
+flag (before the command) or `BACKUP_CLI_UNIT_DIR`.
 
 ## Deadline
 

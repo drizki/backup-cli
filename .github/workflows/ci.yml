@@ -43,7 +43,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Format, vet, file size, completeness
-        run: make fmt vet size complete
+        run: make fmt vet size complete docs
       - name: Shellcheck
         run: make shellcheck
       - name: Install script tests

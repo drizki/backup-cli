@@ -1,10 +1,10 @@
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || echo dev)
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 PKG     := github.com/drizki/backup-cli/internal/version
 LDFLAGS := -s -w -X $(PKG).Version=$(VERSION) -X $(PKG).Commit=$(COMMIT) -X $(PKG).Date=$(DATE)
 
-.PHONY: build test race cover lint vuln shellcheck fmt vet size complete covergate check
+.PHONY: build test race cover lint vuln shellcheck fmt vet size complete docs covergate check
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o backup-cli ./cmd/backup-cli
@@ -41,8 +41,11 @@ size:
 complete:
 	./scripts/check-completeness.sh
 
+docs:
+	./scripts/check-docs.sh
+
 covergate:
 	go test -race -coverprofile=coverage.out ./... >/dev/null
 	./scripts/check-coverage.sh coverage.out
 
-check: fmt vet size complete covergate lint vuln shellcheck
+check: fmt vet size complete docs covergate lint vuln shellcheck

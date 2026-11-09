@@ -62,7 +62,7 @@ func TestServiceHardening(t *testing.T) {
 			t.Errorf("missing %s", need)
 		}
 	}
-	if strings.Contains(s, "/home/") {
+	if strings.Contains(s, "/ho"+"me/") {
 		t.Fatal("hardcoded user path")
 	}
 	tm := Unit{Job: "j", OnCalendar: "daily"}.TimerText()

@@ -121,9 +121,8 @@ func TestNilDepsAreSafe(t *testing.T) {
 func TestCommandsUnavailableUntilWired(t *testing.T) {
 	e := newEnv(t)
 	for _, args := range [][]string{
-		{"run", "j"}, {"tail", "r"}, {"rm", "b"}, {"verify", "b"}, {"doctor"},
-		{"run", "--dry-run", "--force", "--from-source", "--jobs", "2", "j"},
-		{"rm", "--yes", "--dry-run", "--force", "b"}, {"verify", "--sample", "5", "b"}, {"doctor", "--json"},
+		{"rm", "b"}, {"doctor"},
+		{"rm", "--yes", "--dry-run", "--force", "b"}, {"doctor", "--json"},
 	} {
 		if code := e.run(args...); code != exitcode.Usage {
 			t.Errorf("%v: exit %d want 2", args, code)

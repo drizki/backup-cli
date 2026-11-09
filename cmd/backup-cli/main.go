@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/drizki/backup-cli/internal/cli"
+	"github.com/drizki/backup-cli/internal/engine"
 )
 
 func main() {
@@ -12,5 +13,6 @@ func main() {
 }
 
 func run() int {
+	cli.RegisterEngine(engine.Run)
 	return cli.Execute()
 }

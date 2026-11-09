@@ -18,7 +18,7 @@ func sum(s string) string {
 }
 
 var trickyNames = []string{
-	"plain.txt", "with space.txt", "tab\there", "new\nline", `back\slash`, "pct%41", "ünï/cödé.txt", "dir/sub/file", "\x01ctl", "-dash",
+	"plain.txt", "with space.txt", "tab\there", "new\nline", `back\slash`, "pct%41", "ünï/cödé.txt", "dir/sub/file", "\x01ctl", "-dash", "end\r", "mid\rdle", "both\r\n",
 }
 
 func sampleEntries() []Entry {

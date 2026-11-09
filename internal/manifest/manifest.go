@@ -98,15 +98,15 @@ func Unescape(s string) (string, error) {
 	return b.String(), nil
 }
 
-// sha256Line formats one manifest line using GNU coreutils escaping: a name containing a backslash
-// or newline gets a leading backslash on the line and escaped characters.
+// sha256Line formats one manifest line using GNU coreutils escaping: a name
+// containing a backslash, newline or carriage return gets a leading backslash
+// on the line and those characters are written as \\, \n and \r.
 func sha256Line(hexSum, rel string) string {
 	name := "./" + rel
-	if !strings.ContainsAny(name, "\\\n") {
+	if !strings.ContainsAny(name, "\\\n\r") {
 		return hexSum + "  " + name + "\n"
 	}
-	name = strings.ReplaceAll(name, "\\", "\\\\")
-	name = strings.ReplaceAll(name, "\n", "\\n")
+	name = strings.NewReplacer("\\", "\\\\", "\n", "\\n", "\r", "\\r").Replace(name)
 	return "\\" + hexSum + "  " + name + "\n"
 }
 

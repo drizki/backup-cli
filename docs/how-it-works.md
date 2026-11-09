@@ -46,6 +46,8 @@ as a local cache.
    `<dst>.partial` to `<dst>`; fsync the parent.
 10. Sample verification: re-hash a random sample of files (default 2%, at least
     one; `--verify-sample PCT`, 0 disables). A failure marks the run `failed`.
+    If SIGTERM arrives during this step the committed backup is kept, the run
+    succeeds with a warning, and retention is skipped until the next run.
 11. Only after a successful run: prune backups beyond `--keep` through the
     guarded delete path. Then hooks run.
 12. Release the lock and exit.

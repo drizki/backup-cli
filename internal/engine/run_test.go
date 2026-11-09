@@ -307,3 +307,25 @@ func TestUnreadableSourceFileFailsAndKeepsPartial(t *testing.T) {
 	f.mustRun() // resumes and completes
 	f.sameAsSource(f.latest())
 }
+
+func TestBiweeklyGateIgnoresAMarkerDatedInTheFuture(t *testing.T) {
+	f := newFixture(t)
+	f.j.Biweekly = true
+	f.save()
+	f.now = baseTime.AddDate(3, 0, 0) // clock wrong: three years ahead
+	f.mustRun()
+	f.now = baseTime.AddDate(0, 1, 0) // clock fixed
+	f.step = 0
+	f.mustRun()
+	runs, _ := f.store.ListRuns(f.j.Name)
+	warned := false
+	for _, st := range runs {
+		if st.State == state.StateSkipped {
+			t.Errorf("run %s skipped by the biweekly gate: %s", st.RunID, st.SkipReason)
+		}
+		warned = warned || hasWarning(st, "clock skew")
+	}
+	if !warned {
+		t.Errorf("no clock-skew warning in the runs: %+v", runs)
+	}
+}

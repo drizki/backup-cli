@@ -95,6 +95,10 @@ func (r *run) gateSkips() bool {
 	}
 	last := committed[len(committed)-1].Marker.Created
 	age := r.e.now().Sub(last)
+	if age < 0 {
+		r.warn("clock skew: the last backup is dated %s in the future; treating it as old enough", (-age).Round(time.Minute))
+		return false
+	}
 	if age >= biweeklyGap {
 		return false
 	}

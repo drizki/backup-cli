@@ -103,32 +103,6 @@ func checkOrderAndReasons(t *testing.T, all []Backup) {
 	}
 }
 
-func TestIsCommitted(t *testing.T) {
-	parent := t.TempDir()
-	ok := mkdir(t, filepath.Join(parent, "ok"))
-	marker(t, ok, "docs", time.Now())
-	if !IsCommitted(ok, "docs") || IsCommitted(ok, "other") {
-		t.Fatal("job id check")
-	}
-	if IsCommitted(filepath.Join(parent, "missing"), "docs") {
-		t.Fatal("missing dir committed")
-	}
-	// symlink to a committed dir is not a committed backup
-	link := filepath.Join(parent, "link")
-	if err := os.Symlink(ok, link); err != nil {
-		t.Fatal(err)
-	}
-	if IsCommitted(link, "docs") {
-		t.Fatal("symlink treated as committed")
-	}
-	// .partial name never committed
-	p := mkdir(t, filepath.Join(parent, "x.partial"))
-	marker(t, p, "docs", time.Now())
-	if IsCommitted(p, "docs") {
-		t.Fatal("partial committed")
-	}
-}
-
 func TestReadMarkerValidation(t *testing.T) {
 	d := t.TempDir()
 	write := func(s string) {

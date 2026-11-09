@@ -40,22 +40,6 @@ func TestReadMissingFile(t *testing.T) {
 	}
 }
 
-func TestIsMountpoint(t *testing.T) {
-	info := writeTable(t, table)
-	for p, want := range map[string]bool{
-		"/": true, "/mnt/backup": true, "/mnt/backup/": true, "/mnt/backup/with space": true,
-		"/mnt": false, "/mnt/backup/sub": false, "/srv/data": true,
-	} {
-		got, err := IsMountpoint(info, p)
-		if err != nil || got != want {
-			t.Errorf("%s: got %v, %v want %v", p, got, err, want)
-		}
-	}
-	if _, err := IsMountpoint(filepath.Join(t.TempDir(), "nope"), "/"); err == nil {
-		t.Fatal("expected an error")
-	}
-}
-
 func TestInside(t *testing.T) {
 	info := writeTable(t, table)
 	got, err := Inside(info, "/mnt")

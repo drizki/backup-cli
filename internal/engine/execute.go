@@ -8,6 +8,7 @@ import (
 
 	"github.com/drizki/backup-cli/internal/backupset"
 	"github.com/drizki/backup-cli/internal/exitcode"
+	"github.com/drizki/backup-cli/internal/journal"
 	"github.com/drizki/backup-cli/internal/lock"
 	"github.com/drizki/backup-cli/internal/manifest"
 	"github.com/drizki/backup-cli/internal/state"
@@ -107,7 +108,7 @@ func (r *run) gateSkips() bool {
 func rootCollision(entries []manifest.Entry) error {
 	for _, e := range entries {
 		switch e.Path {
-		case manifest.SHA256Name, manifest.TSVName, backupset.MarkerName, manifest.JournalName:
+		case manifest.SHA256Name, manifest.TSVName, backupset.MarkerName, journal.Name:
 			return exitcode.Refusedf("the source contains %q at its top level, which would collide with the backup's own files", e.Path)
 		}
 	}

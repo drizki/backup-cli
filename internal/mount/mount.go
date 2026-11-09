@@ -78,22 +78,6 @@ func unescape(s string) string {
 	return b.String()
 }
 
-// IsMountpoint reports whether the cleaned absolute path p is a mount point
-// in the table at info.
-func IsMountpoint(info, p string) (bool, error) {
-	entries, err := Read(info)
-	if err != nil {
-		return false, err
-	}
-	p = filepath.Clean(p)
-	for _, e := range entries {
-		if e.Point == p {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // Inside lists the mount points at or below dir.
 func Inside(info, dir string) ([]string, error) {
 	entries, err := Read(info)

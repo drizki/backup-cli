@@ -216,7 +216,7 @@ func TestOpenReadOnlyFlagsAndFallback(t *testing.T) {
 
 func TestOpenersReadFiles(t *testing.T) {
 	p := writeTemp(t, []byte("abc"))
-	for name, op := range map[string]FlagOpener{"path": PathOpener(p), "root": rootOpener(t, p)} {
+	for name, op := range map[string]FlagOpener{"root": rootOpener(t, p)} {
 		f, err := OpenReadOnly(op)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
@@ -245,7 +245,7 @@ func TestOpenReadOnlyRefusesFinalSymlink(t *testing.T) {
 	if err := os.Symlink(p, link); err != nil {
 		t.Fatal(err)
 	}
-	if f, err := OpenReadOnly(PathOpener(link)); err == nil {
+	if f, err := OpenReadOnly(rootOpener(t, link)); err == nil {
 		_ = f.Close()
 		t.Fatal("followed a symlink")
 	}

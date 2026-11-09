@@ -99,13 +99,6 @@ func WriteMarker(dir string, m Marker) error {
 	return state.WriteJSON(filepath.Join(dir, MarkerName), m)
 }
 
-// IsCommitted reports whether dir is a committed backup of jobName: not a
-// .partial directory, not a symlink, and carrying a valid marker for the job.
-func IsCommitted(dir, jobName string) bool {
-	b := classify(dir, jobName)
-	return b.Status == Committed
-}
-
 func classify(dir, jobName string) Backup {
 	b := Backup{Name: filepath.Base(dir), Path: dir, Job: jobName}
 	if strings.HasSuffix(b.Name, PartialSuffix) {

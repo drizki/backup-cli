@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/drizki/backup-cli/internal/journal"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -115,7 +116,7 @@ func TestVerifySizeAndMissing(t *testing.T) {
 
 func TestVerifyExtraFileWarns(t *testing.T) {
 	dir, _ := buildBackup(t, testFiles())
-	for _, n := range []string{"extra.txt", JournalName} {
+	for _, n := range []string{"extra.txt", journal.Name} {
 		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}

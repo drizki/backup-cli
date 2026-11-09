@@ -23,11 +23,6 @@ func OpenReadOnly(open FlagOpener) (*os.File, error) {
 	return f, err
 }
 
-// PathOpener adapts os.OpenFile for a fixed path.
-func PathOpener(path string) FlagOpener {
-	return func(flags int) (*os.File, error) { return os.OpenFile(path, flags, 0) }
-}
-
 // RootOpener adapts a rooted open (which cannot escape its root) for a
 // fixed relative path.
 func RootOpener(root *os.Root, rel string) FlagOpener {

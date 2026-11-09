@@ -17,11 +17,8 @@ import (
 
 	"github.com/drizki/backup-cli/internal/backupset"
 	"github.com/drizki/backup-cli/internal/copyx"
+	"github.com/drizki/backup-cli/internal/journal"
 )
-
-// JournalName is the resume journal that may linger inside a committed
-// backup; it is bookkeeping, not data.
-const JournalName = ".backup-cli-partial.jsonl"
 
 // VerifyOptions controls Verify.
 type VerifyOptions struct {
@@ -188,7 +185,7 @@ func findExtras(dir string, entries []Entry, rep *Report) {
 
 func isMeta(rel string) bool {
 	switch rel {
-	case SHA256Name, TSVName, backupset.MarkerName, JournalName:
+	case SHA256Name, TSVName, backupset.MarkerName, journal.Name:
 		return true
 	}
 	return strings.HasPrefix(rel, backupset.MarkerName+".tmp-")

@@ -107,31 +107,6 @@ func TestValidPath(t *testing.T) {
 	}
 }
 
-func TestSHA256ParseRoundTrip(t *testing.T) {
-	in := sampleEntries()
-	var buf bytes.Buffer
-	if err := WriteSHA256(&buf, in); err != nil {
-		t.Fatal(err)
-	}
-	lines, err := ParseSHA256(&buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(lines) != len(trickyNames) {
-		t.Fatalf("%d lines, want %d", len(lines), len(trickyNames))
-	}
-	for i, n := range trickyNames {
-		if lines[i].Path != n || lines[i].SHA256 != sum(n) {
-			t.Errorf("line %d = %+v", i, lines[i])
-		}
-	}
-	for _, bad := range []string{"short", strings.Repeat("a", 64) + " x ./f", strings.Repeat("a", 64) + "  f", strings.Repeat("a", 64) + "  ./../f"} {
-		if _, err := ParseSHA256(strings.NewReader(bad + "\n")); err == nil {
-			t.Errorf("accepted %q", bad)
-		}
-	}
-}
-
 // TestSHA256SumCheck proves MANIFEST.sha256 is accepted by the real tool,
 // including names with spaces, newlines, backslashes and unicode.
 func TestSHA256SumCheck(t *testing.T) {

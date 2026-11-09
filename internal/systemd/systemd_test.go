@@ -260,6 +260,11 @@ func TestFake(t *testing.T) {
 	if err := m.Remove(u.Name()); err != nil || len(f.Installed) != 0 {
 		t.Fatal("remove")
 	}
+	checkFakeFailures(t, m, f, u)
+}
+
+func checkFakeFailures(t *testing.T, m Manager, f *Fake, u Unit) {
+	t.Helper()
 	f.FailOn["Start"] = errors.New("x")
 	f.FailOn["Install"] = errors.New("x")
 	f.FailOn["Enable"] = errors.New("x")

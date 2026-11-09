@@ -51,12 +51,12 @@ func (r *Real) Available() bool {
 func (r *Real) servicePath(name string) string { return filepath.Join(r.UnitDir, name+".service") }
 func (r *Real) timerPath(name string) string   { return filepath.Join(r.UnitDir, name+".timer") }
 
-func (r *Real) ctl(args ...string) ([]byte, error) {
+func (r *Real) ctl(args ...string) error {
 	out, err := r.Run(context.Background(), "systemctl", args...)
 	if err != nil {
-		return out, fmt.Errorf("systemctl %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("systemctl %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 	}
-	return out, nil
+	return nil
 }
 
 // Install writes the service and timer files and reloads systemd.
@@ -70,8 +70,7 @@ func (r *Real) Install(u Unit) error {
 	if err := state.WriteFileAtomic(r.timerPath(u.Name()), []byte(u.TimerText()), 0o644); err != nil {
 		return err
 	}
-	_, err := r.ctl("daemon-reload")
-	return err
+	return r.ctl("daemon-reload")
 }
 
 // Enable enables and starts the timer. For a non-default unit dir the timer
@@ -81,14 +80,12 @@ func (r *Real) Enable(name string) error {
 	if filepath.Clean(r.UnitDir) != DefaultUnitDir {
 		target = r.timerPath(name)
 	}
-	_, err := r.ctl("enable", "--now", target)
-	return err
+	return r.ctl("enable", "--now", target)
 }
 
 // Disable stops and disables the timer.
 func (r *Real) Disable(name string) error {
-	_, err := r.ctl("disable", "--now", name+".timer")
-	return err
+	return r.ctl("disable", "--now", name+".timer")
 }
 
 // Remove deletes the unit files (missing files are fine) and reloads.
@@ -98,8 +95,7 @@ func (r *Real) Remove(name string) error {
 			return err
 		}
 	}
-	_, err := r.ctl("daemon-reload")
-	return err
+	return r.ctl("daemon-reload")
 }
 
 // IsActive reports whether the timer is active. A non-zero exit from
@@ -118,6 +114,5 @@ func (r *Real) IsActive(name string) (bool, error) {
 
 // Start launches the service without waiting for it to finish.
 func (r *Real) Start(name string) error {
-	_, err := r.ctl("start", "--no-block", name+".service")
-	return err
+	return r.ctl("start", "--no-block", name+".service")
 }

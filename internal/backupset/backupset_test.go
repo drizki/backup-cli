@@ -84,6 +84,11 @@ func TestScanClassifies(t *testing.T) {
 		}
 	}
 
+	checkOrderAndReasons(t, all)
+}
+
+func checkOrderAndReasons(t *testing.T, all []Backup) {
+	t.Helper()
 	com := OnlyCommitted(all)
 	if len(com) != 2 || com[0].Name != "docs-20260101T000000Z" || com[1].Name != "docs-20260102T000000Z" {
 		t.Fatalf("committed order: %+v", com)

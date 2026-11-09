@@ -61,66 +61,85 @@ func Parse(spec string, opts Options) (Result, error) {
 	if spec == "" {
 		return Result{}, errors.New("schedule is empty")
 	}
-	kind, rest, _ := strings.Cut(spec, ",")
 	if k, expr, ok := strings.Cut(spec, ":"); ok && strings.EqualFold(k, "oncalendar") {
 		return parseCalendar(spec, expr, opts)
 	}
+	kind, rest, hasRest := strings.Cut(spec, ",")
 	kind = strings.ToLower(kind)
-	parts := []string{}
-	if rest != "" || strings.Contains(spec, ",") {
+	var parts []string
+	if hasRest {
 		parts = strings.Split(rest, ",")
 	}
 	res := Result{Spec: spec, Kind: kind}
+	var err error
 	switch kind {
 	case "daily":
-		if len(parts) != 1 {
-			return Result{}, errors.New("daily schedule must be daily,HH:MM")
-		}
-		h, m, err := parseTime(parts[0])
-		if err != nil {
-			return Result{}, err
-		}
-		res.OnCalendar = fmt.Sprintf("*-*-* %02d:%02d:00", h, m)
-		res.Cron = fmt.Sprintf("%d %d * * *", m, h)
+		err = parseDaily(&res, parts)
 	case "weekly", "biweekly":
-		if len(parts) != 2 {
-			return Result{}, fmt.Errorf("%s schedule must be %s,<day>,HH:MM", kind, kind)
-		}
-		d, ok := days[strings.ToLower(parts[0])]
-		if !ok {
-			return Result{}, fmt.Errorf("unknown day %q (use mon..sun or full day names)", parts[0])
-		}
-		h, m, err := parseTime(parts[1])
-		if err != nil {
-			return Result{}, err
-		}
-		res.OnCalendar = fmt.Sprintf("%s *-*-* %02d:%02d:00", d.cal, h, m)
-		res.Cron = fmt.Sprintf("%d %d * * %d", m, h, d.cron)
-		res.BiweeklyGate = kind == "biweekly"
+		err = parseWeekly(&res, parts)
 	case "monthly":
-		if len(parts) != 2 {
-			return Result{}, errors.New("monthly schedule must be monthly,<day-of-month 1-28>,HH:MM")
-		}
-		dom, err := strconv.Atoi(parts[0])
-		if err != nil || strings.TrimSpace(parts[0]) != parts[0] {
-			return Result{}, fmt.Errorf("invalid day of month %q", parts[0])
-		}
-		if dom >= 29 && dom <= 31 {
-			return Result{}, fmt.Errorf("day of month %d is not allowed: not every month has it, use 1-28", dom)
-		}
-		if dom < 1 || dom > 28 {
-			return Result{}, fmt.Errorf("day of month %d out of range 1-28", dom)
-		}
-		h, m, err := parseTime(parts[1])
-		if err != nil {
-			return Result{}, err
-		}
-		res.OnCalendar = fmt.Sprintf("*-*-%02d %02d:%02d:00", dom, h, m)
-		res.Cron = fmt.Sprintf("%d %d %d * *", m, h, dom)
+		err = parseMonthly(&res, parts)
 	default:
-		return Result{}, fmt.Errorf("unknown schedule %q (use daily, weekly, biweekly, monthly or oncalendar:<expr>)", kind)
+		err = fmt.Errorf("unknown schedule %q (use daily, weekly, biweekly, monthly or oncalendar:<expr>)", kind)
+	}
+	if err != nil {
+		return Result{}, err
 	}
 	return res, nil
+}
+
+func parseDaily(res *Result, parts []string) error {
+	if len(parts) != 1 {
+		return errors.New("daily schedule must be daily,HH:MM")
+	}
+	h, m, err := parseTime(parts[0])
+	if err != nil {
+		return err
+	}
+	res.OnCalendar = fmt.Sprintf("*-*-* %02d:%02d:00", h, m)
+	res.Cron = fmt.Sprintf("%d %d * * *", m, h)
+	return nil
+}
+
+func parseWeekly(res *Result, parts []string) error {
+	if len(parts) != 2 {
+		return fmt.Errorf("%s schedule must be %s,<day>,HH:MM", res.Kind, res.Kind)
+	}
+	d, ok := days[strings.ToLower(parts[0])]
+	if !ok {
+		return fmt.Errorf("unknown day %q (use mon..sun or full day names)", parts[0])
+	}
+	h, m, err := parseTime(parts[1])
+	if err != nil {
+		return err
+	}
+	res.OnCalendar = fmt.Sprintf("%s *-*-* %02d:%02d:00", d.cal, h, m)
+	res.Cron = fmt.Sprintf("%d %d * * %d", m, h, d.cron)
+	res.BiweeklyGate = res.Kind == "biweekly"
+	return nil
+}
+
+func parseMonthly(res *Result, parts []string) error {
+	if len(parts) != 2 {
+		return errors.New("monthly schedule must be monthly,<day-of-month 1-28>,HH:MM")
+	}
+	dom, err := strconv.Atoi(parts[0])
+	if err != nil || strings.TrimSpace(parts[0]) != parts[0] {
+		return fmt.Errorf("invalid day of month %q", parts[0])
+	}
+	if dom >= 29 && dom <= 31 {
+		return fmt.Errorf("day of month %d is not allowed: not every month has it, use 1-28", dom)
+	}
+	if dom < 1 || dom > 28 {
+		return fmt.Errorf("day of month %d out of range 1-28", dom)
+	}
+	h, m, err := parseTime(parts[1])
+	if err != nil {
+		return err
+	}
+	res.OnCalendar = fmt.Sprintf("*-*-%02d %02d:%02d:00", dom, h, m)
+	res.Cron = fmt.Sprintf("%d %d %d * *", m, h, dom)
+	return nil
 }
 
 func parseCalendar(spec, expr string, opts Options) (Result, error) {

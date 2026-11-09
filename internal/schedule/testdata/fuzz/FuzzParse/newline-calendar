@@ -1,0 +1,2 @@
+go test fuzz v1
+string("oncalendar:*-*-* 02:00\nExecStart=/bin/sh")

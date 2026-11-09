@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"t\":\"h\",\"job\":\"j\",\"run_id\":\"r\"}\n{\"t\":\"s\"}\n{\"t\":\"f\",\"pa")

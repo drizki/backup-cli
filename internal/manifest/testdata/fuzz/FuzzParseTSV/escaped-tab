@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("path\ttype\tsize\tmtime_ns\tmode\tuid\tgid\tsha256\tlink_target\na%09b\tsymlink\t0\t1\t0777\t0\t0\t-\tx%0Ay\n")

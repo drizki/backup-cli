@@ -1,0 +1,2 @@
+go test fuzz v1
+string("monthly,31,00:00")

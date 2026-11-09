@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -327,5 +328,28 @@ func TestBiweeklyGateIgnoresAMarkerDatedInTheFuture(t *testing.T) {
 	}
 	if !warned {
 		t.Errorf("no clock-skew warning in the runs: %+v", runs)
+	}
+}
+
+func TestStatusKeepsOnlyTheFirstWarningsAndTheirCount(t *testing.T) {
+	const n = 1500
+	f := newFixture(t)
+	for i := range n {
+		f.put(fmt.Sprintf("many/f%05d", i), []byte("x"))
+	}
+	f.stamp()
+	f.mustRun()
+	// Files removed from the previous backup by hand: each one warns.
+	if err := os.RemoveAll(filepath.Join(f.latest(), "many")); err != nil {
+		t.Fatal(err)
+	}
+	f.out.Reset()
+	f.mustRun()
+	st := f.lastStatus()
+	if len(st.Warnings) != maxStatusWarnings || st.WarningsTotal < n {
+		t.Fatalf("stored %d warnings, total %d; want %d stored and at least %d counted", len(st.Warnings), st.WarningsTotal, maxStatusWarnings, n)
+	}
+	if got := strings.Count(f.out.String(), "cannot be read"); got != n {
+		t.Errorf("run log holds %d of the %d warnings", got, n)
 	}
 }

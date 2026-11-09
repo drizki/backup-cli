@@ -153,10 +153,25 @@ func (r *run) update(f func(*state.Status)) {
 	}
 }
 
+// maxStatusWarnings caps the warnings kept in status.json; run.log holds all.
+const maxStatusWarnings = 100
+
+// warn logs a warning and counts it in the status. Only the first
+// maxStatusWarnings texts are stored, and the status file is not rewritten for
+// each one (the progress tick and the final update persist it).
 func (r *run) warn(format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
 	r.log.Warnf("%s", msg)
-	r.update(func(s *state.Status) { s.Warnings = append(s.Warnings, msg) })
+	r.addWarning(msg)
+}
+
+func (r *run) addWarning(msg string) {
+	r.stMu.Lock()
+	defer r.stMu.Unlock()
+	r.st.WarningsTotal++
+	if len(r.st.Warnings) < maxStatusWarnings {
+		r.st.Warnings = append(r.st.Warnings, msg)
+	}
 }
 
 // startProgress refreshes the status file while the run is active.

@@ -124,8 +124,6 @@ func describeSkipped(r *run, p *plan) {
 		r.log.Warnf("skipped %s (%s)", s.Path, s.Kind)
 	}
 	if len(p.skipped) > 0 {
-		r.update(func(st *state.Status) {
-			st.Warnings = append(st.Warnings, fmt.Sprintf("%d special file(s) skipped", len(p.skipped)))
-		})
+		r.addWarning(fmt.Sprintf("%d special file(s) skipped", len(p.skipped)))
 	}
 }

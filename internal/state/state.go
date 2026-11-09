@@ -166,7 +166,8 @@ type Status struct {
 	FilesCopiedFromPrev   int64     `json:"files_copied_from_prev"`
 	BytesTotal            int64     `json:"bytes_total"`
 	BytesFromSource       int64     `json:"bytes_from_source"`
-	Warnings              []string  `json:"warnings"`
+	Warnings              []string  `json:"warnings"` // the first few only; run.log has them all
+	WarningsTotal         int       `json:"warnings_total"`
 	Errors                []string  `json:"errors"`
 	ExitCode              int       `json:"exit_code"`
 	RefuseReason          string    `json:"refuse_reason"`

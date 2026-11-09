@@ -7,6 +7,9 @@ set -eu
 # Add an entry here only for a missing external binary or a root requirement.
 SKIP_ALLOWLIST="
 internal/manifest/manifest_test.go:sha256sum binary missing
+internal/copyx/copy_test.go:sha256sum binary missing
+internal/walk/walk_test.go:running as root
+internal/lock/lock_test.go:flock binary missing
 "
 
 status=0

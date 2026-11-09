@@ -118,21 +118,6 @@ func TestNilDepsAreSafe(t *testing.T) {
 	}
 }
 
-func TestCommandsUnavailableUntilWired(t *testing.T) {
-	e := newEnv(t)
-	for _, args := range [][]string{
-		{"rm", "b"}, {"doctor"},
-		{"rm", "--yes", "--dry-run", "--force", "b"}, {"doctor", "--json"},
-	} {
-		if code := e.run(args...); code != exitcode.Usage {
-			t.Errorf("%v: exit %d want 2", args, code)
-		}
-		if !strings.Contains(e.errb.String(), ErrUnavailable.Error()) {
-			t.Errorf("%v: %q", args, e.errb.String())
-		}
-	}
-}
-
 func TestParseInterspersed(t *testing.T) {
 	newFS := func() (*flagSet, *bool, *string) {
 		fs := newFlagSet("t")

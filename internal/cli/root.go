@@ -44,7 +44,10 @@ type EngineFunc func(ctx context.Context, req EngineRequest) error
 type Deps struct {
 	Stdout, Stderr io.Writer
 	Stdin          io.Reader
-	Getenv         func(string) string
+	// IsTTY reports whether a reader is an interactive terminal (rm asks
+	// for confirmation only then); nil means never.
+	IsTTY  func(io.Reader) bool
+	Getenv func(string) string
 	// Manager builds the systemd Manager for a unit directory.
 	Manager func(unitDir string) systemd.Manager
 	// Executable returns the absolute path of this binary.
@@ -67,6 +70,7 @@ func DefaultDeps() Deps {
 		Stdout:     os.Stdout,
 		Stderr:     os.Stderr,
 		Stdin:      os.Stdin,
+		IsTTY:      isTerminal,
 		Getenv:     os.Getenv,
 		Manager:    func(dir string) systemd.Manager { return systemd.NewReal(dir) },
 		Executable: executablePath,
